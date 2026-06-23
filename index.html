@@ -1,0 +1,1438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realistic 3D Rubik's Cube - Speed Timer & Solver</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #05070c;
+        }
+        .mono-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Custom scrollbar for clean visual experience */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0b0f19;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #334155;
+        }
+    </style>
+</head>
+<body class="text-gray-100 overflow-x-hidden min-h-screen flex flex-col">
+
+    <header class="border-b border-gray-800/80 bg-gray-950/70 backdrop-blur px-6 py-4 flex items-center justify-between z-20 sticky top-0">
+        <div class="flex items-center space-x-3">
+            <div class="bg-gradient-to-tr from-indigo-500 to-purple-600 p-2 rounded-xl shadow-lg shadow-indigo-500/20">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-200 to-gray-400">CubeVerse 3D Pro</h1>
+                <p class="text-xs text-gray-400">Drag Stickers directly, Orbit from Any Angle & Track Times</p>
+            </div>
+        </div>
+        
+        <div class="flex items-center space-x-3">
+            <button id="help-btn" class="p-2 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white transition-all flex items-center gap-1.5 text-sm" title="How to play">
+                <i data-lucide="help-circle" class="w-5 h-5"></i>
+                <span class="hidden md:inline">Instructions</span>
+            </button>
+            <button id="theme-btn" class="p-2 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white transition-all flex items-center gap-1.5 text-sm" title="Change Stickers Color Schema">
+                <i data-lucide="palette" class="w-5 h-5"></i>
+                <span class="hidden md:inline">Palettes</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 p-4 md:p-6 max-w-7xl mx-auto w-full">
+        
+        <!-- Left Column: 3D Play Space -->
+        <section class="xl:col-span-8 flex flex-col space-y-4">
+            
+            <!-- Scramble display bar -->
+            <div class="bg-gray-900/50 border border-gray-800/80 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div class="flex-1">
+                    <span class="text-xs font-bold uppercase tracking-widest text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-full">Scramble Formula</span>
+                    <div id="scramble-display" class="mono-font text-sm md:text-base font-bold text-gray-300 mt-2 tracking-wide leading-relaxed">
+                        Ready! Click Scramble or drag the stickers to solve.
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2 w-full md:w-auto shrink-0">
+                    <button id="scramble-btn" class="w-full md:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold shadow-lg shadow-indigo-600/20 transition-all active:scale-95 flex items-center justify-center gap-2">
+                        <i data-lucide="shuffle" class="w-4 h-4"></i>
+                        Scramble
+                    </button>
+                    <button id="solve-btn" class="w-full md:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-semibold shadow-lg shadow-emerald-600/20 transition-all active:scale-95 flex items-center justify-center gap-2" title="Rewinds history steps to solve the cube">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                        Rewind
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3D Realistic Viewport -->
+            <div class="relative bg-gray-950/50 border border-gray-800/70 rounded-3xl overflow-hidden aspect-square md:aspect-video flex items-center justify-center group shadow-2xl min-h-[380px] md:min-h-[480px]">
+                
+                <!-- Dynamic helper labels -->
+                <div class="absolute top-4 left-4 flex flex-col gap-2 z-10 pointer-events-none select-none">
+                    <div class="flex items-center gap-2 bg-black/70 backdrop-blur px-3 py-1.5 rounded-lg border border-white/5 text-xs text-gray-300">
+                        <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-ping"></span>
+                        <span>Drag Cube stickers directly to spin layers</span>
+                    </div>
+                    <div class="flex items-center gap-2 bg-black/70 backdrop-blur px-3 py-1.5 rounded-lg border border-white/5 text-xs text-gray-300">
+                        <i data-lucide="rotate-3d" class="w-3.5 h-3.5 text-indigo-400"></i>
+                        <span>Drag empty black space to orbit 360° freely</span>
+                    </div>
+                </div>
+
+                <div class="absolute top-4 right-4 z-10 flex gap-2">
+                    <button id="reset-camera-btn" class="bg-black/70 hover:bg-black/90 backdrop-blur p-2.5 rounded-xl border border-white/10 text-gray-300 hover:text-white transition-all flex items-center gap-1.5 text-xs" title="Reset View">
+                        <i data-lucide="maximize-2" class="w-4 h-4"></i>
+                        Reset Camera
+                    </button>
+                </div>
+
+                <!-- ThreeJS Canvas hook with touch-action configured to prevent layout swipe conflicts -->
+                <div id="cube-canvas-container" class="w-full h-full cursor-grab active:cursor-grabbing" style="touch-action: none;"></div>
+
+                <!-- Solved Badge -->
+                <div class="absolute bottom-4 left-4 z-10 select-none">
+                    <div id="solved-status-badge" class="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-3 py-1.5 rounded-xl font-bold text-xs tracking-wider">
+                        <span class="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                        CUBE SOLVED
+                    </div>
+                </div>
+
+                <!-- Speed indicator -->
+                <div class="absolute bottom-4 right-4 z-10 bg-black/70 backdrop-blur px-3 py-1.5 rounded-lg border border-white/10 text-xs text-gray-300">
+                    Speed: <span id="speed-display" class="font-bold text-indigo-400">Normal</span>
+                </div>
+            </div>
+
+            <!-- Manual command panel -->
+            <div class="bg-gray-900/50 border border-gray-800/80 rounded-2xl p-4 flex flex-col space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+                        <i data-lucide="sliders" class="w-4 h-4 text-indigo-400"></i>
+                        Manual Rotation Commands
+                    </h3>
+                    <span class="text-[10px] text-gray-500 font-mono">Click to turn clockwise • Shift+Click or Prime buttons for counter-clockwise</span>
+                </div>
+
+                <div class="grid grid-cols-6 gap-2">
+                    <!-- Standard Clockwise Moves -->
+                    <button onclick="triggerMove('U')" class="group bg-gray-800/40 hover:bg-gray-700/60 border border-gray-700/40 py-2.5 rounded-xl transition-all flex flex-col items-center">
+                        <span class="text-sm font-bold text-white group-hover:scale-110 transition-transform">U</span>
+                        <span class="text-[9px] text-gray-400 mt-0.5">Up</span>
+                    </button>
+                    <button onclick="triggerMove('D')" class="group bg-gray-800/40 hover:bg-gray-700/60 border border-gray-700/40 py-2.5 rounded-xl transition-all flex flex-col items-center">
+                        <span class="text-sm font-bold text-white group-hover:scale-110 transition-transform">D</span>
+                        <span class="text-[9px] text-gray-400 mt-0.5">Down</span>
+                    </button>
+                    <button onclick="triggerMove('L')" class="group bg-gray-800/40 hover:bg-gray-700/60 border border-gray-700/40 py-2.5 rounded-xl transition-all flex flex-col items-center">
+                        <span class="text-sm font-bold text-white group-hover:scale-110 transition-transform">L</span>
+                        <span class="text-[9px] text-gray-400 mt-0.5">Left</span>
+                    </button>
+                    <button onclick="triggerMove('R')" class="group bg-gray-800/40 hover:bg-gray-700/60 border border-gray-700/40 py-2.5 rounded-xl transition-all flex flex-col items-center">
+                        <span class="text-sm font-bold text-white group-hover:scale-110 transition-transform">R</span>
+                        <span class="text-[9px] text-gray-400 mt-0.5">Right</span>
+                    </button>
+                    <button onclick="triggerMove('F')" class="group bg-gray-800/40 hover:bg-gray-700/60 border border-gray-700/40 py-2.5 rounded-xl transition-all flex flex-col items-center">
+                        <span class="text-sm font-bold text-white group-hover:scale-110 transition-transform">F</span>
+                        <span class="text-[9px] text-gray-400 mt-0.5">Front</span>
+                    </button>
+                    <button onclick="triggerMove('B')" class="group bg-gray-800/40 hover:bg-gray-700/60 border border-gray-700/40 py-2.5 rounded-xl transition-all flex flex-col items-center">
+                        <span class="text-sm font-bold text-white group-hover:scale-110 transition-transform">B</span>
+                        <span class="text-[9px] text-gray-400 mt-0.5">Back</span>
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-6 gap-2">
+                    <!-- Standard Prime Counter-Clockwise Moves -->
+                    <button onclick="triggerMove('U\'')" class="bg-indigo-950/20 hover:bg-indigo-900/30 border border-indigo-900/30 py-2 rounded-xl transition-all text-xs font-bold text-indigo-400">U'</button>
+                    <button onclick="triggerMove('D\'')" class="bg-indigo-950/20 hover:bg-indigo-900/30 border border-indigo-900/30 py-2 rounded-xl transition-all text-xs font-bold text-indigo-400">D'</button>
+                    <button onclick="triggerMove('L\'')" class="bg-indigo-950/20 hover:bg-indigo-900/30 border border-indigo-900/30 py-2 rounded-xl transition-all text-xs font-bold text-indigo-400">L'</button>
+                    <button onclick="triggerMove('R\'')" class="bg-indigo-950/20 hover:bg-indigo-900/30 border border-indigo-900/30 py-2 rounded-xl transition-all text-xs font-bold text-indigo-400">R'</button>
+                    <button onclick="triggerMove('F\'')" class="bg-indigo-950/20 hover:bg-indigo-900/30 border border-indigo-900/30 py-2 rounded-xl transition-all text-xs font-bold text-indigo-400">F'</button>
+                    <button onclick="triggerMove('B\'')" class="bg-indigo-950/20 hover:bg-indigo-900/30 border border-indigo-900/30 py-2 rounded-xl transition-all text-xs font-bold text-indigo-400">B'</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Column: Speedcubing Stopwatch, Averages, & Session Solves -->
+        <aside class="xl:col-span-4 flex flex-col space-y-6">
+            
+            <div id="timer-card" class="bg-gray-900/50 border border-gray-800/80 rounded-3xl p-6 flex flex-col items-center justify-center relative overflow-hidden group shadow-xl">
+                
+                <div class="absolute -top-12 -right-12 w-32 h-32 bg-indigo-600/10 rounded-full blur-2xl group-hover:bg-indigo-600/20 transition-all"></div>
+                
+                <span class="text-[10px] font-bold uppercase tracking-widest text-indigo-400 flex items-center gap-1.5 self-start mb-2">
+                    <i data-lucide="timer" class="w-4 h-4"></i>
+                    Speed stopwatch
+                </span>
+                
+                <!-- Dynamic numeric digital readout -->
+                <div id="timer-display" class="mono-font text-5xl md:text-6xl font-extrabold tracking-tight text-white my-6 tabular-nums select-none transition-all duration-100">
+                    00:00.00
+                </div>
+
+                <p id="timer-instruction" class="text-xs text-gray-400 text-center mb-6">
+                    Press <span class="px-2 py-0.5 bg-gray-800 border border-gray-700 rounded text-gray-200">Spacebar</span> or tap the touch panel below to start/stop.
+                </p>
+
+                <!-- Interactive panel triggers for tablet/mobile devices -->
+                <button id="timer-tap-area" class="w-full py-4 bg-gray-800/80 hover:bg-indigo-600/10 active:bg-indigo-600/25 border border-gray-700/60 rounded-2xl font-bold text-sm tracking-wide text-gray-200 hover:text-indigo-400 transition-all flex items-center justify-center gap-2">
+                    <i data-lucide="play" class="w-4 h-4"></i>
+                    Tap to Start / Stop Timer
+                </button>
+
+                <!-- Averages/Performance values -->
+                <div class="grid grid-cols-3 gap-2 w-full mt-6 pt-6 border-t border-gray-800/80 text-center">
+                    <div>
+                        <span class="block text-[9px] text-gray-500 uppercase font-bold tracking-wider">PB Single</span>
+                        <span id="stat-best" class="mono-font font-bold text-gray-200 text-sm">-</span>
+                    </div>
+                    <div>
+                        <span class="block text-[9px] text-gray-500 uppercase font-bold tracking-wider">Ao5 (Avg)</span>
+                        <span id="stat-ao5" class="mono-font font-bold text-gray-200 text-sm">-</span>
+                    </div>
+                    <div>
+                        <span class="block text-[9px] text-gray-500 uppercase font-bold tracking-wider">Ao12 (Avg)</span>
+                        <span id="stat-ao12" class="mono-font font-bold text-gray-200 text-sm">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gray-900/50 border border-gray-800/80 rounded-3xl p-6 flex flex-col space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+                        <i data-lucide="list-ordered" class="w-4 h-4 text-indigo-400"></i>
+                        Solve History
+                    </h3>
+                    <button id="clear-solves-btn" class="text-[11px] text-red-400 hover:text-red-300 transition-all flex items-center gap-1">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        Wipe History
+                    </button>
+                </div>
+
+                <div class="max-h-40 overflow-y-auto pr-2 space-y-2" id="solves-list-container">
+                    <div class="text-xs text-gray-500 italic text-center py-4">No recorded times yet. Complete a solve or stop the stopwatch!</div>
+                </div>
+            </div>
+
+            <div class="bg-gray-900/50 border border-gray-800/80 rounded-3xl p-6 flex flex-col space-y-4">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+                    <i data-lucide="sliders-horizontal" class="w-4 h-4 text-indigo-400"></i>
+                    Speed & Interface Controls
+                </h3>
+
+                <!-- Animation speed range modifier -->
+                <div>
+                    <label class="text-xs text-gray-400 block mb-2 flex justify-between">
+                        <span>Transition Animation Delay</span>
+                        <span id="slider-val-label" class="text-indigo-400 font-bold">Medium (250ms)</span>
+                    </label>
+                    <input type="range" id="speed-slider" min="100" max="600" step="50" value="250" class="w-full accent-indigo-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer">
+                    <div class="flex justify-between text-[9px] text-gray-500 mt-1 select-none">
+                        <span>Speed (100ms)</span>
+                        <span>Cinematic (600ms)</span>
+                    </div>
+                </div>
+
+                <button id="instant-reset-btn" class="w-full py-3 bg-red-950/20 hover:bg-red-950/30 border border-red-900/30 hover:border-red-800 text-red-400 rounded-2xl text-xs font-semibold tracking-wide transition-all flex items-center justify-center gap-2">
+                    <i data-lucide="refresh-ccw" class="w-3.5 h-3.5"></i>
+                    Instant Solve / Hard Reset
+                </button>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Palette Picker modal -->
+    <div id="palette-overlay" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-gray-900 border border-gray-800 max-w-md w-full mx-4 rounded-3xl p-6 shadow-2xl relative">
+            <button id="close-palette-btn" class="absolute top-4 right-4 text-gray-400 hover:text-white transition-all">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+            <h2 class="text-lg font-bold mb-1 flex items-center gap-2">
+                <i data-lucide="palette" class="w-5 h-5 text-indigo-400"></i>
+                Sticker Theme Picker
+            </h2>
+            <p class="text-xs text-gray-400 mb-6">Select a visual theme to change the color palette of the stickers instantly.</p>
+
+            <div class="space-y-3">
+                <button onclick="setCubePalette('classic')" class="w-full p-4 bg-gray-800/40 hover:bg-gray-800/80 border border-gray-700/60 rounded-2xl flex items-center justify-between text-left transition-all">
+                    <div>
+                        <span class="font-semibold block text-sm">Classic Standard</span>
+                        <span class="text-xs text-gray-400">The standard speedcube colors.</span>
+                    </div>
+                    <div class="flex space-x-1">
+                        <span class="w-3.5 h-3.5 bg-red-600 rounded"></span>
+                        <span class="w-3.5 h-3.5 bg-green-600 rounded"></span>
+                        <span class="w-3.5 h-3.5 bg-blue-600 rounded"></span>
+                    </div>
+                </button>
+
+                <button onclick="setCubePalette('pastel')" class="w-full p-4 bg-gray-800/40 hover:bg-gray-800/80 border border-gray-700/60 rounded-2xl flex items-center justify-between text-left transition-all">
+                    <div>
+                        <span class="font-semibold block text-sm">Retro Pastel</span>
+                        <span class="text-xs text-gray-400">Warm and calming soft shades.</span>
+                    </div>
+                    <div class="flex space-x-1">
+                        <span class="w-3.5 h-3.5 bg-rose-400 rounded"></span>
+                        <span class="w-3.5 h-3.5 bg-emerald-300 rounded"></span>
+                        <span class="w-3.5 h-3.5 bg-sky-300 rounded"></span>
+                    </div>
+                </button>
+
+                <button onclick="setCubePalette('neon')" class="w-full p-4 bg-gray-800/40 hover:bg-gray-800/80 border border-gray-700/60 rounded-2xl flex items-center justify-between text-left transition-all">
+                    <div>
+                        <span class="font-semibold block text-sm">Cyberpunk Neon</span>
+                        <span class="text-xs text-gray-400">Fluorescent, bright cyberpunk themes.</span>
+                    </div>
+                    <div class="flex space-x-1">
+                        <span class="w-3.5 h-3.5 bg-fuchsia-500 rounded"></span>
+                        <span class="w-3.5 h-3.5 bg-lime-400 rounded"></span>
+                        <span class="w-3.5 h-3.5 bg-cyan-400 rounded"></span>
+                    </div>
+                </button>
+
+                <button onclick="setCubePalette('sunset')" class="w-full p-4 bg-gray-800/40 hover:bg-gray-800/80 border border-gray-700/60 rounded-2xl flex items-center justify-between text-left transition-all">
+                    <div>
+                        <span class="font-semibold block text-sm">Desert Sunset</span>
+                        <span class="text-xs text-gray-400">Cozy gradient solar and warm red tones.</span>
+                    </div>
+                    <div class="flex space-x-1">
+                        <span class="w-3.5 h-3.5 bg-amber-600 rounded"></span>
+                        <span class="w-3.5 h-3.5 bg-amber-400 rounded"></span>
+                        <span class="w-3.5 h-3.5 bg-rose-600 rounded"></span>
+                    </div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Instructions Overlay -->
+    <div id="instructions-overlay" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-gray-900 border border-gray-800 max-w-lg w-full mx-4 rounded-3xl p-6 shadow-2xl relative max-h-[85vh] overflow-y-auto">
+            <button id="close-help-btn" class="absolute top-4 right-4 text-gray-400 hover:text-white transition-all">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+            <h2 class="text-lg font-bold mb-1 flex items-center gap-2">
+                <i data-lucide="help-circle" class="w-5 h-5 text-indigo-400"></i>
+                Sticker Dragging & Controls Guide
+            </h2>
+            <p class="text-xs text-gray-400 mb-6">Learn how to easily rotate faces, adjust camera angles, and trigger shortcuts.</p>
+
+            <div class="space-y-4 text-sm text-gray-300">
+                <div>
+                    <h4 class="font-bold text-white mb-1.5 flex items-center gap-1.5 text-xs uppercase tracking-wider text-indigo-400">
+                        <i data-lucide="sparkles" class="w-4 h-4"></i> Swipe & Direct Sticker Dragging
+                    </h4>
+                    <p class="text-xs text-gray-300 leading-relaxed mb-2">
+                        You can rotate cube layers directly with your cursor or finger! Just click/tap on any sticker, hold, and drag in the direction you want to turn. The app will calculate the correct slice and execute the rotation relative to your camera view.
+                    </p>
+                </div>
+
+                <div>
+                    <h4 class="font-bold text-white mb-1.5 flex items-center gap-1.5 text-xs uppercase tracking-wider text-indigo-400">
+                        <i data-lucide="rotate-3d" class="w-4 h-4"></i> Fully Unlocked 3D Camera Angles
+                    </h4>
+                    <p class="text-xs text-gray-300 leading-relaxed">
+                        To orbit, rotate, and view your Rubik's cube from absolutely any angle, simply drag your mouse or slide your finger on the **empty background space** outside the cube boundary. Double-click or click "Reset Camera" at any time to return to home perspective.
+                    </p>
+                </div>
+
+                <div>
+                    <h4 class="font-bold text-white mb-1.5 flex items-center gap-1.5 text-xs uppercase tracking-wider text-indigo-400">
+                        <i data-lucide="keyboard" class="w-4 h-4"></i> Keyboard Speedcubing Shortcuts
+                    </h4>
+                    <p class="text-xs text-gray-300 mb-2 leading-relaxed">
+                        Press these keys on your physical keyboard to turn corresponding faces clockwise:
+                    </p>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div class="flex justify-between p-2 bg-gray-800 rounded border border-gray-700"><span class="font-mono text-indigo-400 font-bold">U</span> <span>Up (White)</span></div>
+                        <div class="flex justify-between p-2 bg-gray-800 rounded border border-gray-700"><span class="font-mono text-indigo-400 font-bold">D</span> <span>Down (Yellow)</span></div>
+                        <div class="flex justify-between p-2 bg-gray-800 rounded border border-gray-700"><span class="font-mono text-indigo-400 font-bold">L</span> <span>Left (Orange)</span></div>
+                        <div class="flex justify-between p-2 bg-gray-800 rounded border border-gray-700"><span class="font-mono text-indigo-400 font-bold">R</span> <span>Right (Red)</span></div>
+                        <div class="flex justify-between p-2 bg-gray-800 rounded border border-gray-700"><span class="font-mono text-indigo-400 font-bold">F</span> <span>Front (Green)</span></div>
+                        <div class="flex justify-between p-2 bg-gray-800 rounded border border-gray-700"><span class="font-mono text-indigo-400 font-bold">B</span> <span>Back (Blue)</span></div>
+                    </div>
+                    <p class="text-[11px] text-yellow-400/80 mt-2">
+                        💡 **Protip:** Hold **Shift** while pressing any of these keys to perform counter-clockwise prime turns (e.g., <kbd class="px-1 py-0.5 bg-gray-850 rounded">Shift + R</kbd> runs $R'$).
+                    </p>
+                </div>
+
+                <div>
+                    <h4 class="font-bold text-white mb-1.5 flex items-center gap-1.5 text-xs uppercase tracking-wider text-indigo-400">
+                        <i data-lucide="zap" class="w-4 h-4"></i> Core Algorithm Triggers
+                    </h4>
+                    <p class="text-xs text-gray-300 mb-2">
+                        Try animating these standard algorithm triggers instantly on your 3D cube model:
+                    </p>
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between p-2.5 bg-gray-800 border border-gray-700 rounded-xl">
+                            <div>
+                                <span class="block font-bold text-xs">The standard "Sexy Move"</span>
+                                <span class="mono-font text-[11px] text-indigo-300 font-bold">R U R' U'</span>
+                            </div>
+                            <button onclick="demoAlgo(['R', 'U', 'R\'', 'U\''])" class="bg-indigo-600/30 hover:bg-indigo-600 text-indigo-400 hover:text-white px-3 py-1 rounded-lg text-xs font-bold transition-all">Animate</button>
+                        </div>
+                        <div class="flex items-center justify-between p-2.5 bg-gray-800 border border-gray-700 rounded-xl">
+                            <div>
+                                <span class="block font-bold text-xs">The standard "Sledgehammer"</span>
+                                <span class="mono-font text-[11px] text-indigo-300 font-bold">R' F R F'</span>
+                            </div>
+                            <button onclick="demoAlgo(['R\'', 'F', 'R', 'F\''])" class="bg-indigo-600/30 hover:bg-indigo-600 text-indigo-400 hover:text-white px-3 py-1 rounded-lg text-xs font-bold transition-all">Animate</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // -------------------------------------------------------------
+        // Color Schemes Configuration
+        // -------------------------------------------------------------
+        const PALETTES = {
+            classic: {
+                R: 0xDC2626, // Red
+                L: 0xEA580C, // Orange
+                U: 0xF8FAFC, // White
+                D: 0xEAB308, // Yellow
+                F: 0x16A34A, // Green
+                B: 0x2563EB, // Blue
+                inner: 0x0a0c10 // Matte Black Cubie Body Plastic
+            },
+            pastel: {
+                R: 0xFB7185, // Pastel Rose Red
+                L: 0xFDBA74, // Soft Orange
+                U: 0xF1F5F9, // Soft White
+                D: 0xFEF08A, // Lemon Pastel Yellow
+                F: 0x86EFAC, // Mint Green
+                B: 0x93C5FD, // Sky Pastel Blue
+                inner: 0x111622 // Slate Blue Body
+            },
+            neon: {
+                R: 0xFF0055, // Neon Magenta
+                L: 0xFF8800, // Neon Coral Orange
+                U: 0xEDFDFE, // Bright Cyan-White
+                D: 0xEEFF00, // Neon Yellow
+                F: 0x00FF66, // Bright Neon Green
+                B: 0x00F0FF, // Vivid Cyan Blue
+                inner: 0x02050b // Ultra dark obsidian plastic
+            },
+            sunset: {
+                R: 0x991B1B, // Dark sunset Crimson
+                L: 0xD97706, // Solar Orange
+                U: 0xFFF7ED, // Cozy Warm White
+                D: 0xF59E0B, // Sun Yellow
+                F: 0xBE123C, // Deep Warm Red
+                B: 0x1E1B4B, // Dark Indigo night blue
+                inner: 0x0a0d14 // Deep Navy Obsidian
+            }
+        };
+
+        let activePaletteName = 'classic';
+        let currentPalette = PALETTES[activePaletteName];
+
+        // -------------------------------------------------------------
+        // Main Three.js Global State Variables
+        // -------------------------------------------------------------
+        let scene, camera, renderer, controls;
+        let cubies = []; // Array storing all 27 individual cubelet meshes
+        let isMoving = false; // Flag to prevent command collision during rotation animations
+        let moveQueue = []; // Queue for executing multiple moves (e.g., scramble & solve sequences)
+        let moveHistory = []; // Keeps track of executed moves for manual undo / rewind solvability
+        let currentMoveSpeed = 250; // default transition speed in ms
+
+        // Container selector
+        const container = document.getElementById('cube-canvas-container');
+
+        // -------------------------------------------------------------
+        // Cursor / Touch Drag State variables for direct layer rotations
+        // -------------------------------------------------------------
+        let isPointerDown = false;
+        let pointerStart = { x: 0, y: 0 };
+        let clickedCubie = null;
+        let clickedNormal = null; // THREE.Vector3 representing intersection normal
+        let clickedPoint = null;  // THREE.Vector3 representing exact world coordinate intersection
+
+        // -------------------------------------------------------------
+        // Speedcubing Stopwatch Timer Logic State
+        // -------------------------------------------------------------
+        let timerInterval = null;
+        let timerStart = null;
+        let isTimerRunning = false;
+        let holdsSpace = false;
+        let solveTimes = []; // Array of logged float milliseconds
+
+        function initThree() {
+            // Scene Setup
+            scene = new THREE.Scene();
+
+            // Camera Setup - viewing the cube from any angle with perfect perspective settings
+            camera = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 0.1, 100);
+            camera.position.set(6, 5, 8);
+
+            // WebGL Renderer Setup with Soft Shadow mapping enabled for realism
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Orbit Camera controls - unlocked for free viewing from all directions
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.08;
+            controls.minDistance = 3.5;
+            controls.maxDistance = 20;
+            controls.enablePan = false; // Keep cube locked at origin target
+            controls.maxPolarAngle = Math.PI; // Full range polar look up/down
+
+            // Hemisphere light for beautiful sky-ground ambient gradients
+            const hemiLight = new THREE.HemisphereLight(0xffffff, 0x111625, 0.95);
+            scene.add(hemiLight);
+
+            // High specular direct key light casting realistic soft shadows
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            dirLight.position.set(6, 12, 8);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 1024;
+            dirLight.shadow.mapSize.height = 1024;
+            dirLight.shadow.camera.near = 0.5;
+            dirLight.shadow.camera.far = 25;
+            dirLight.shadow.camera.left = -4;
+            dirLight.shadow.camera.right = 4;
+            dirLight.shadow.camera.top = 4;
+            dirLight.shadow.camera.bottom = -4;
+            dirLight.shadow.bias = -0.0005;
+            scene.add(dirLight);
+
+            // Subtle warm and cold fill lights to illuminate unshaded areas
+            const fillLight1 = new THREE.DirectionalLight(0x7da3ff, 0.35);
+            fillLight1.position.set(-8, 3, -6);
+            scene.add(fillLight1);
+
+            const fillLight2 = new THREE.DirectionalLight(0xffca8a, 0.2);
+            fillLight2.position.set(6, -5, -4);
+            scene.add(fillLight2);
+
+            buildRealisticBackground();
+
+            // Create initial Rubik's Cube blocks
+            buildRubiksCube();
+
+            // Register Cursor/Touch Direct Sticker Drag Handlers
+            setupInteractivePointerDrag();
+
+            // Fire main Render Loop
+            animateLoop();
+        }
+
+        function buildRealisticBackground() {
+            // Particle field simulating dust motes drifting in lab light
+            const particleCount = 75;
+            const particleGeo = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            const colors = new Float32Array(particleCount * 3);
+
+            for (let i = 0; i < particleCount; i++) {
+                // Random position scatter
+                positions[i * 3] = (Math.random() - 0.5) * 22;
+                positions[i * 3 + 1] = (Math.random() - 0.5) * 16 + 2;
+                positions[i * 3 + 2] = (Math.random() - 0.5) * 22;
+
+                // Color interpolation between warm gold and indigo blue
+                const ratio = Math.random();
+                colors[i * 3] = ratio * 0.9 + (1 - ratio) * 0.2; // R
+                colors[i * 3 + 1] = ratio * 0.6 + (1 - ratio) * 0.3; // G
+                colors[i * 3 + 2] = ratio * 0.2 + (1 - ratio) * 0.9; // B
+            }
+
+            particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            particleGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const particleMat = new THREE.PointsMaterial({
+                size: 0.18,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.7,
+                blending: THREE.AdditiveBlending
+            });
+
+            const particles = new THREE.Points(particleGeo, particleMat);
+            scene.add(particles);
+
+            // Store particles reference in scene to animate float movement
+            scene.userData.particles = particles;
+
+            // Realistic glowing neon speedcubing desk mat right below the cube
+            const matSize = 8;
+            const matGeo = new THREE.PlaneGeometry(matSize, matSize);
+            const matMat = new THREE.MeshStandardMaterial({
+                color: 0x05070c,
+                roughness: 0.6,
+                metalness: 0.2
+            });
+            const speedMat = new THREE.Mesh(matGeo, matMat);
+            speedMat.rotation.x = -Math.PI / 2;
+            speedMat.position.y = -2.8;
+            speedMat.receiveShadow = true;
+            scene.add(speedMat);
+
+            // Adding neon grid lines to the mat
+            const gridHelper = new THREE.GridHelper(matSize, 8, 0x312e81, 0x1e1b4b);
+            gridHelper.position.y = -2.78;
+            scene.add(gridHelper);
+        }
+
+        function buildRubiksCube() {
+            // Clear any previous cubie structures in scene
+            cubies.forEach(cubie => scene.remove(cubie));
+            cubies = [];
+
+            // Generate a 3x3 grid centered around Origin (0,0,0)
+            const offsets = [-1, 0, 1];
+
+            // Outer loop through x, y, z positions
+            for (let x of offsets) {
+                for (let y of offsets) {
+                    for (let z of offsets) {
+                        
+                        // Cubie Core: Matte-black premium plastic body with high roughness and slightly bevelled feel
+                        const bodyGeometry = new THREE.BoxGeometry(0.92, 0.92, 0.92);
+                        const bodyMaterial = new THREE.MeshStandardMaterial({
+                            color: currentPalette.inner,
+                            roughness: 0.8,
+                            metalness: 0.15
+                        });
+
+                        // Create group parent so body and stickers move together seamlessly
+                        const cubieGroup = new THREE.Group();
+                        const cubieBody = new THREE.Mesh(bodyGeometry, bodyMaterial);
+                        cubieBody.castShadow = true;
+                        cubieBody.receiveShadow = true;
+                        cubieGroup.add(cubieBody);
+
+                        // Glossy Tile Stickers: Slightly raised (offset) thin tiles with glossy light-catching clearcoat properties
+                        const stickerThickness = 0.035;
+                        const stickerWidth = 0.76;
+                        const stickerOffset = 0.46; // Distance from the center of the cubie
+
+                        const glossyTileProps = {
+                            roughness: 0.1,
+                            metalness: 0.05,
+                            clearcoat: 1.0,
+                            clearcoatRoughness: 0.05
+                        };
+
+                        // Right Face (+X)
+                        if (x === 1) {
+                            const geom = new THREE.BoxGeometry(stickerThickness, stickerWidth, stickerWidth);
+                            const mat = new THREE.MeshPhysicalMaterial({ color: currentPalette.R, ...glossyTileProps });
+                            const tile = new THREE.Mesh(geom, mat);
+                            tile.position.set(stickerOffset, 0, 0);
+                            cubieGroup.add(tile);
+                        }
+                        // Left Face (-X)
+                        if (x === -1) {
+                            const geom = new THREE.BoxGeometry(stickerThickness, stickerWidth, stickerWidth);
+                            const mat = new THREE.MeshPhysicalMaterial({ color: currentPalette.L, ...glossyTileProps });
+                            const tile = new THREE.Mesh(geom, mat);
+                            tile.position.set(-stickerOffset, 0, 0);
+                            cubieGroup.add(tile);
+                        }
+                        // Top Face (+Y)
+                        if (y === 1) {
+                            const geom = new THREE.BoxGeometry(stickerWidth, stickerThickness, stickerWidth);
+                            const mat = new THREE.MeshPhysicalMaterial({ color: currentPalette.U, ...glossyTileProps });
+                            const tile = new THREE.Mesh(geom, mat);
+                            tile.position.set(0, stickerOffset, 0);
+                            cubieGroup.add(tile);
+                        }
+                        // Bottom Face (-Y)
+                        if (y === -1) {
+                            const geom = new THREE.BoxGeometry(stickerWidth, stickerThickness, stickerWidth);
+                            const mat = new THREE.MeshPhysicalMaterial({ color: currentPalette.D, ...glossyTileProps });
+                            const tile = new THREE.Mesh(geom, mat);
+                            tile.position.set(0, -stickerOffset, 0);
+                            cubieGroup.add(tile);
+                        }
+                        // Front Face (+Z)
+                        if (z === 1) {
+                            const geom = new THREE.BoxGeometry(stickerWidth, stickerWidth, stickerThickness);
+                            const mat = new THREE.MeshPhysicalMaterial({ color: currentPalette.F, ...glossyTileProps });
+                            const tile = new THREE.Mesh(geom, mat);
+                            tile.position.set(0, 0, stickerOffset);
+                            cubieGroup.add(tile);
+                        }
+                        // Back Face (-Z)
+                        if (z === -1) {
+                            const geom = new THREE.BoxGeometry(stickerWidth, stickerWidth, stickerThickness);
+                            const mat = new THREE.MeshPhysicalMaterial({ color: currentPalette.B, ...glossyTileProps });
+                            const tile = new THREE.Mesh(geom, mat);
+                            tile.position.set(0, 0, -stickerOffset);
+                            cubieGroup.add(tile);
+                        }
+
+                        // Position cubie in logical coordinates
+                        cubieGroup.position.set(x, y, z);
+                        
+                        // Bind coordinates tracker properties
+                        cubieGroup.customCoords = { x, y, z };
+
+                        scene.add(cubieGroup);
+                        cubies.push(cubieGroup);
+                    }
+                }
+            }
+            updateSolvedStatus();
+        }
+
+        // -------------------------------------------------------------
+        // Hot-swap Palette
+        // -------------------------------------------------------------
+        window.setCubePalette = function(paletteName) {
+            if (!PALETTES[paletteName]) return;
+            activePaletteName = paletteName;
+            currentPalette = PALETTES[paletteName];
+            
+            // Rebuild the cube to update physical materials instantly without resetting moves
+            // Record current matrices so we preserve placement scramble state
+            const stateCache = cubies.map(cubie => {
+                return {
+                    pos: cubie.position.clone(),
+                    rot: cubie.quaternion.clone(),
+                    coords: { ...cubie.customCoords }
+                };
+            });
+
+            // Rebuild
+            buildRubiksCube();
+
+            // Re-apply states matching spatial layout
+            for (let i = 0; i < cubies.length; i++) {
+                cubies[i].position.copy(stateCache[i].pos);
+                cubies[i].quaternion.copy(stateCache[i].rot);
+                cubies[i].customCoords = stateCache[i].coords;
+            }
+
+            // Close Modal
+            document.getElementById('palette-overlay').classList.add('hidden');
+            showToast(`Theme changed to ${paletteName.toUpperCase()}`, "success");
+        };
+
+        function animateLoop() {
+            requestAnimationFrame(animateLoop);
+            
+            // Update Orbit camera controls
+            controls.update();
+
+            // Drifting background particles movement
+            if (scene.userData.particles) {
+                const particles = scene.userData.particles;
+                const time = Date.now() * 0.0003;
+                particles.rotation.y = time * 0.12;
+                particles.rotation.x = time * 0.05;
+            }
+            
+            // Render Scene
+            renderer.render(scene, camera);
+
+            // Execute queued moves sequentially if nothing is actively translating
+            if (!isMoving && moveQueue.length > 0) {
+                const nextMove = moveQueue.shift();
+                executeRotation(nextMove.face, nextMove.clockwise, nextMove.isDemo);
+            }
+        }
+
+        // Handle Responsive Resizing
+        window.addEventListener('resize', () => {
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        });
+
+        // -------------------------------------------------------------
+        // Rotation helper mappings: Mapping target face key to plane alignments
+        // -------------------------------------------------------------
+        const FACE_DEFINITIONS = {
+            'U': { axis: 'y', val: 1, angle: -Math.PI / 2 },
+            'D': { axis: 'y', val: -1, angle: Math.PI / 2 },
+            'L': { axis: 'x', val: -1, angle: Math.PI / 2 },
+            'R': { axis: 'x', val: 1, angle: -Math.PI / 2 },
+            'F': { axis: 'z', val: 1, angle: -Math.PI / 2 },
+            'B': { axis: 'z', val: -1, angle: Math.PI / 2 },
+            // Middle slice supports for direct sticker dragging
+            'M': { axis: 'x', val: 0, angle: Math.PI / 2 },
+            'E': { axis: 'y', val: 0, angle: Math.PI / 2 },
+            'S': { axis: 'z', val: 0, angle: -Math.PI / 2 }
+        };
+
+        function executeRotation(face, clockwise = true, isDemo = false) {
+            if (isMoving) return;
+            isMoving = true;
+
+            const def = FACE_DEFINITIONS[face];
+            if (!def) {
+                isMoving = false;
+                return;
+            }
+
+            // Target Angle Adjustment
+            let targetAngle = def.angle;
+            if (!clockwise) targetAngle = -targetAngle;
+
+            // Gather all cubie mesh elements located on the targeted cross-section layer
+            const tolerance = 0.15;
+            const movingCubies = cubies.filter(cubie => {
+                const posVal = cubie.position[def.axis];
+                return Math.abs(posVal - def.val) < tolerance;
+            });
+
+            // Create temporary rotating pivot anchor group
+            const pivot = new THREE.Group();
+            scene.add(pivot);
+
+            // Bind current moving items to the pivot group
+            movingCubies.forEach(cubie => {
+                pivot.attach(cubie);
+            });
+
+            // Animate Pivot rotation
+            let elapsed = 0;
+            const duration = currentMoveSpeed; // customizable speed
+            const startRot = 0;
+            const targetRot = targetAngle;
+            const clock = new THREE.Clock();
+
+            function animatePivot() {
+                const delta = clock.getDelta() * 1000; // to ms
+                elapsed += delta;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // Apply rotation directly on assigned axis
+                if (def.axis === 'x') {
+                    pivot.rotation.x = startRot + progress * (targetRot - startRot);
+                } else if (def.axis === 'y') {
+                    pivot.rotation.y = startRot + progress * (targetRot - startRot);
+                } else if (def.axis === 'z') {
+                    pivot.rotation.z = startRot + progress * (targetRot - startRot);
+                }
+
+                if (progress < 1) {
+                    requestAnimationFrame(animatePivot);
+                } else {
+                    // Finalize move step
+                    if (def.axis === 'x') pivot.rotation.x = targetRot;
+                    if (def.axis === 'y') pivot.rotation.y = targetRot;
+                    if (def.axis === 'z') pivot.rotation.z = targetRot;
+
+                    pivot.updateMatrixWorld();
+
+                    // Re-bind cubies back to original parent scene world with updated matrices
+                    movingCubies.forEach(cubie => {
+                        scene.attach(cubie);
+                        // Stabilize clean integer coordinates to avoid math creep
+                        cubie.position.x = Math.round(cubie.position.x);
+                        cubie.position.y = Math.round(cubie.position.y);
+                        cubie.position.z = Math.round(cubie.position.z);
+                    });
+
+                    // Remove pivot group
+                    scene.remove(pivot);
+
+                    // Add to move history if it's not a demo or direct solver call
+                    if (!isDemo) {
+                        moveHistory.push({ face, clockwise });
+                    }
+
+                    isMoving = false;
+                    
+                    // Hook to check game state
+                    updateSolvedStatus();
+                }
+            }
+
+            clock.getDelta(); // reset clock
+            animatePivot();
+        }
+
+        function setupInteractivePointerDrag() {
+            container.addEventListener('pointerdown', onPointerDown);
+            container.addEventListener('pointermove', onPointerMove);
+            window.addEventListener('pointerup', onPointerUp);
+        }
+
+        function onPointerDown(e) {
+            if (isMoving) return;
+
+            // Calculate normalized coordinates
+            const rect = renderer.domElement.getBoundingClientRect();
+            const mouse = new THREE.Vector2(
+                ((e.clientX - rect.left) / rect.width) * 2 - 1,
+                -((e.clientY - rect.top) / rect.height) * 2 + 1
+            );
+
+            // Raycast intersection test against the cubie blocks
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(cubies, true); // true to check deep group meshes (stickers)
+
+            if (intersects.length > 0) {
+                const hit = intersects[0];
+                
+                // Climb tree to find the parent cubie Group
+                let obj = hit.object;
+                while (obj && obj.parent !== scene) {
+                    obj = obj.parent;
+                }
+                
+                if (obj) {
+                    clickedCubie = obj;
+                    clickedPoint = hit.point.clone();
+
+                    // Retrieve normal in world space from the local hit face normal
+                    const localNormal = hit.face.normal.clone();
+                    
+                    // The direct visual object is a child inside parent, transform to world normal
+                    const normalMatrix = new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld);
+                    clickedNormal = localNormal.clone().applyMatrix3(normalMatrix).normalize();
+
+                    isPointerDown = true;
+                    pointerStart.x = e.clientX;
+                    pointerStart.y = e.clientY;
+
+                    // Temporarily disable standard OrbitControls to lock the camera during layer dragging
+                    controls.enabled = false;
+                }
+            }
+        }
+
+        function onPointerMove(e) {
+            if (!isPointerDown || !clickedCubie || isMoving) return;
+
+            const dx = e.clientX - pointerStart.x;
+            const dy = e.clientY - pointerStart.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // Drag threshold of 18px triggers precise slice rotation
+            if (distance > 18) {
+                // Immediately disable drag state to avoid multi-triggering
+                isPointerDown = false;
+
+                const dragVector2D = new THREE.Vector2(dx, dy);
+                handleDynamicFaceSwipe(dragVector2D);
+            }
+        }
+
+        function onPointerUp() {
+            isPointerDown = false;
+            clickedCubie = null;
+            clickedNormal = null;
+            clickedPoint = null;
+            
+            // Re-enable orbital camera rotation instantly on background space
+            controls.enabled = true;
+        }
+
+        function handleDynamicFaceSwipe(dragVector2D) {
+            // Unlocked Camera Alignment Vector Projection
+            const nx = Math.round(clickedNormal.x);
+            const ny = Math.round(clickedNormal.y);
+            const nz = Math.round(clickedNormal.z);
+
+            // Establish local orthogonal directions (U and V) relative to the face clicked
+            let u, v;
+            if (Math.abs(nx) > 0.9) {
+                u = new THREE.Vector3(0, 0, -nx); // Horizontal tangent
+                v = new THREE.Vector3(0, 1, 0);   // Vertical tangent (Up)
+            } else if (Math.abs(ny) > 0.9) {
+                u = new THREE.Vector3(1, 0, 0);   // Horizontal tangent (Right)
+                v = new THREE.Vector3(0, 0, -ny); // Vertical tangent (Forward)
+            } else {
+                u = new THREE.Vector3(1, 0, 0);   // Horizontal tangent (Right)
+                v = new THREE.Vector3(0, 1, 0);   // Vertical tangent (Up)
+            }
+
+            // Project 3D vector points onto active 2D screen coordinate pixels
+            const pWorld = clickedPoint.clone();
+            const pWorldU = pWorld.clone().add(u);
+            const pWorldV = pWorld.clone().add(v);
+
+            const pScreen = pWorld.clone().project(camera);
+            const pScreenU = pWorldU.clone().project(camera);
+            const pScreenV = pWorldV.clone().project(camera);
+
+            const rect = renderer.domElement.getBoundingClientRect();
+            const posScreen = new THREE.Vector2((pScreen.x * 0.5 + 0.5) * rect.width, (-(pScreen.y * 0.5 - 0.5)) * rect.height);
+            const posScreenU = new THREE.Vector2((pScreenU.x * 0.5 + 0.5) * rect.width, (-(pScreenU.y * 0.5 - 0.5)) * rect.height);
+            const posScreenV = new THREE.Vector2((pScreenV.x * 0.5 + 0.5) * rect.width, (-(pScreenV.y * 0.5 - 0.5)) * rect.height);
+
+            // Local projected vector directions
+            const dirU = new THREE.Vector2().subVectors(posScreenU, posScreen).normalize();
+            const dirV = new THREE.Vector2().subVectors(posScreenV, posScreen).normalize();
+
+            // Dot-product projection to evaluate which way the user dragged
+            const dotU = dragVector2D.dot(dirU);
+            const dotV = dragVector2D.dot(dirV);
+
+            let chosenAxis, chosenSign;
+            if (Math.abs(dotU) > Math.abs(dotV)) {
+                chosenAxis = u;
+                chosenSign = Math.sign(dotU);
+            } else {
+                chosenAxis = v;
+                chosenSign = Math.sign(dotV);
+            }
+
+            // Rotation vector formula is: normal cross motion direction (N x Motion)
+            const motionVec = chosenAxis.clone().multiplyScalar(chosenSign);
+            const normalVec = new THREE.Vector3(nx, ny, nz);
+            const rotVec = new THREE.Vector3().crossVectors(normalVec, motionVec);
+
+            const rx = Math.round(rotVec.x);
+            const ry = Math.round(rotVec.y);
+            const rz = Math.round(rotVec.z);
+
+            // Determine active rotation plane axis
+            let rAxis = '';
+            let rSign = 0;
+            if (Math.abs(rx) > 0.9) { rAxis = 'x'; rSign = rx; }
+            else if (Math.abs(ry) > 0.9) { rAxis = 'y'; rSign = ry; }
+            else if (Math.abs(rz) > 0.9) { rAxis = 'z'; rSign = rz; }
+
+            const cx = Math.round(clickedCubie.position.x);
+            const cy = Math.round(clickedCubie.position.y);
+            const cz = Math.round(clickedCubie.position.z);
+
+            // Mapping cross products to standard Rubik notation: U, D, L, R, F, B, M, E, S
+            let faceToTurn = '';
+            let clockwise = true;
+
+            if (rAxis === 'y') {
+                if (cy === 1) { faceToTurn = 'U'; clockwise = (rSign < 0); }
+                else if (cy === -1) { faceToTurn = 'D'; clockwise = (rSign > 0); }
+                else if (cy === 0) { faceToTurn = 'E'; clockwise = (rSign > 0); }
+            } else if (rAxis === 'x') {
+                if (cx === 1) { faceToTurn = 'R'; clockwise = (rSign < 0); }
+                else if (cx === -1) { faceToTurn = 'L'; clockwise = (rSign > 0); }
+                else if (cx === 0) { faceToTurn = 'M'; clockwise = (rSign > 0); }
+            } else if (rAxis === 'z') {
+                if (cz === 1) { faceToTurn = 'F'; clockwise = (rSign < 0); }
+                else if (cz === -1) { faceToTurn = 'B'; clockwise = (rSign > 0); }
+                else if (cz === 0) { faceToTurn = 'S'; clockwise = (rSign < 0); }
+            }
+
+            if (faceToTurn) {
+                const moveStr = faceToTurn + (clockwise ? "" : "'");
+                triggerMove(moveStr);
+            }
+        }
+
+        // Queue Move Handler
+        function triggerMove(notation) {
+            const cleanNotation = notation.replace("'", "");
+            const clockwise = !notation.includes("'");
+            moveQueue.push({ face: cleanNotation, clockwise: clockwise, isDemo: false });
+        }
+
+        // -------------------------------------------------------------
+        // Scrambler Logic (Generates official state sequences)
+        // -------------------------------------------------------------
+        const possibleMoves = ['U', 'D', 'L', 'R', 'F', 'B'];
+        const notationModifiers = ['', "'", '2'];
+
+        function generateScramble() {
+            let scrambleList = [];
+            let lastFace = '';
+            
+            for (let i = 0; i < 20; i++) {
+                let randomFace;
+                do {
+                    randomFace = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                } while (randomFace === lastFace);
+                
+                const modifier = notationModifiers[Math.floor(Math.random() * notationModifiers.length)];
+                scrambleList.push(randomFace + modifier);
+                lastFace = randomFace;
+            }
+
+            const scrambleString = scrambleList.join(' ');
+            document.getElementById('scramble-display').innerText = scrambleString;
+
+            // Trigger animation queue
+            scrambleList.forEach(move => {
+                const face = move[0];
+                const modifier = move.substring(1);
+                
+                if (modifier === '') {
+                    moveQueue.push({ face, clockwise: true, isDemo: true });
+                } else if (modifier === "'") {
+                    moveQueue.push({ face, clockwise: false, isDemo: true });
+                } else if (modifier === '2') {
+                    moveQueue.push({ face, clockwise: true, isDemo: true });
+                    moveQueue.push({ face, clockwise: true, isDemo: true });
+                }
+            });
+
+            moveHistory = [];
+        }
+
+        function startSolveHistoryRewind() {
+            if (moveHistory.length === 0) {
+                showToast("No active history to rewind! Try scrambling first.", "info");
+                return;
+            }
+
+            const rewindList = [...moveHistory].reverse();
+            moveHistory = []; // Reset manual track
+
+            rewindList.forEach(historyStep => {
+                moveQueue.push({ 
+                    face: historyStep.face, 
+                    clockwise: !historyStep.clockwise, 
+                    isDemo: true 
+                });
+            });
+
+            showToast("Rewinding history steps to solve...", "success");
+        }
+
+        function instantFullReset() {
+            moveQueue = [];
+            moveHistory = [];
+            buildRubiksCube();
+            showToast("Cube reset to fully solved state.", "success");
+        }
+
+        window.demoAlgo = function(movesArr) {
+            document.getElementById('instructions-overlay').classList.add('hidden');
+            movesArr.forEach(m => {
+                const face = m[0];
+                const clockwise = !m.includes("'");
+                moveQueue.push({ face, clockwise, isDemo: true });
+            });
+        };
+
+        function updateSolvedStatus() {
+            const isSolved = checkCubeSolved();
+            const badge = document.getElementById('solved-status-badge');
+
+            if (isSolved) {
+                badge.className = "flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-3 py-1.5 rounded-xl font-bold text-xs tracking-wider";
+                badge.innerHTML = `<span class="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>CUBE SOLVED`;
+                
+                if (isTimerRunning) {
+                    toggleTimerState();
+                    recordSolvedTime();
+                }
+            } else {
+                badge.className = "flex items-center gap-2 bg-rose-500/10 border border-rose-500/30 text-rose-400 px-3 py-1.5 rounded-xl font-bold text-xs tracking-wider";
+                badge.innerHTML = `<span class="w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse"></span>UNSOLVED / PLAYING`;
+            }
+        }
+
+        function checkCubeSolved() {
+            const faces = [
+                { axis: 'x', coord: 1, matIndex: 1 },  // Right Face (Stickers index matches children placement)
+                { axis: 'x', coord: -1, matIndex: 1 }, // Left Face
+                { axis: 'y', coord: 1, matIndex: 1 },  // Top Face
+                { axis: 'y', coord: -1, matIndex: 1 }, // Bottom Face
+                { axis: 'z', coord: 1, matIndex: 1 },  // Front Face
+                { axis: 'z', coord: -1, matIndex: 1 }  // Back Face
+            ];
+
+            // For accurate detection of tiled model, evaluate relative rotations of sticker materials
+            for (let f of faces) {
+                const targetCubs = cubies.filter(c => Math.round(c.position[f.axis]) === f.coord);
+                if (targetCubs.length === 0) return false;
+                
+                // Fetch the exterior active color from first child tile sticker
+                // Body is child 0, other children are active tile stickers
+                const firstCubie = targetCubs[0];
+                if (firstCubie.children.length < 2) continue; // safety check
+                
+                const baseColor = firstCubie.children[1].material.color.getHex();
+                
+                for (let cub of targetCubs) {
+                    // Match physical world-facing sticker tile colors
+                    const matchedStickers = cub.children.slice(1).filter(tile => {
+                        // Locate the specific sticker oriented outwards
+                        const localOffset = tile.position.clone();
+                        const worldOffset = localOffset.applyQuaternion(cub.quaternion);
+                        
+                        if (f.axis === 'x' && Math.round(worldOffset.x * 2) === f.coord) return true;
+                        if (f.axis === 'y' && Math.round(worldOffset.y * 2) === f.coord) return true;
+                        if (f.axis === 'z' && Math.round(worldOffset.z * 2) === f.coord) return true;
+                        return false;
+                    });
+
+                    if (matchedStickers.length > 0) {
+                        if (matchedStickers[0].material.color.getHex() !== baseColor) {
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        function toggleTimerState() {
+            if (!isTimerRunning) {
+                // START TIMER
+                isTimerRunning = true;
+                timerStart = performance.now();
+                document.getElementById('timer-display').classList.remove('text-white');
+                document.getElementById('timer-display').classList.add('text-indigo-400', 'animate-pulse');
+                
+                timerInterval = setInterval(() => {
+                    const elapsed = performance.now() - timerStart;
+                    document.getElementById('timer-display').innerText = formatTime(elapsed);
+                }, 10);
+            } else {
+                // STOP TIMER
+                isTimerRunning = false;
+                clearInterval(timerInterval);
+                document.getElementById('timer-display').classList.remove('text-indigo-400', 'animate-pulse');
+                document.getElementById('timer-display').classList.add('text-white');
+            }
+        }
+
+        function formatTime(ms) {
+            if (ms < 0) ms = 0;
+            const minutes = Math.floor(ms / 60000);
+            const seconds = Math.floor((ms % 60000) / 1000);
+            const centiseconds = Math.floor((ms % 1000) / 10);
+
+            const mStr = minutes > 0 ? `${minutes}:` : '';
+            const sStr = seconds < 10 && minutes > 0 ? `0${seconds}` : seconds;
+            const cStr = centiseconds < 10 ? `0${centiseconds}` : centiseconds;
+
+            return `${mStr}${sStr}.${cStr}`;
+        }
+
+        function recordSolvedTime() {
+            const elapsed = performance.now() - timerStart;
+            solveTimes.push(elapsed);
+            rebuildSessionStats();
+        }
+
+        function rebuildSessionStats() {
+            const listContainer = document.getElementById('solves-list-container');
+            if (solveTimes.length === 0) {
+                listContainer.innerHTML = `<div class="text-xs text-gray-500 italic text-center py-4">No recorded times yet. Complete a solve or stop the stopwatch!</div>`;
+                return;
+            }
+
+            listContainer.innerHTML = '';
+            
+            [...solveTimes].reverse().forEach((time, index) => {
+                const actualIndex = solveTimes.length - index;
+                const row = document.createElement('div');
+                row.className = "flex items-center justify-between p-2.5 bg-gray-800/40 border border-gray-800 rounded-xl hover:bg-gray-800/80 transition-all text-xs";
+                row.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="text-gray-500 font-mono">#${actualIndex}</span>
+                        <span class="font-bold text-indigo-400 font-mono">${formatTime(time)}</span>
+                    </div>
+                    <button onclick="deleteSolve(${actualIndex - 1})" class="text-gray-500 hover:text-red-400 transition-all">
+                        <i data-lucide="trash" class="w-3.5 h-3.5"></i>
+                    </button>
+                `;
+                listContainer.appendChild(row);
+            });
+            lucide.createIcons();
+
+            const best = Math.min(...solveTimes);
+            document.getElementById('stat-best').innerText = formatTime(best);
+
+            if (solveTimes.length >= 5) {
+                const last5 = solveTimes.slice(-5);
+                const sorted = [...last5].sort((a,b) => a - b);
+                const sum = sorted[1] + sorted[2] + sorted[3];
+                document.getElementById('stat-ao5').innerText = formatTime(sum / 3);
+            } else {
+                document.getElementById('stat-ao5').innerText = "-";
+            }
+
+            if (solveTimes.length >= 12) {
+                const last12 = solveTimes.slice(-12);
+                const sorted = [...last12].sort((a,b) => a - b);
+                let sum = 0;
+                for (let i = 1; i <= 10; i++) sum += sorted[i];
+                document.getElementById('stat-ao12').innerText = formatTime(sum / 10);
+            } else {
+                document.getElementById('stat-ao12').innerText = "-";
+            }
+        }
+
+        window.deleteSolve = function(index) {
+            solveTimes.splice(index, 1);
+            rebuildSessionStats();
+        };
+
+        window.addEventListener('keydown', (e) => {
+            if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
+                return;
+            }
+
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (!holdsSpace) {
+                    holdsSpace = true;
+                    if (isTimerRunning) {
+                        toggleTimerState();
+                        recordSolvedTime();
+                    } else {
+                        document.getElementById('timer-display').classList.add('text-rose-500');
+                    }
+                }
+            }
+
+            const key = e.key.toUpperCase();
+            const shiftPressed = e.shiftKey;
+            const validKeys = ['U', 'D', 'L', 'R', 'F', 'B'];
+
+            if (validKeys.includes(key)) {
+                const moveNotation = key + (shiftPressed ? "'" : "");
+                triggerMove(moveNotation);
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                holdsSpace = false;
+                document.getElementById('timer-display').classList.remove('text-rose-500');
+                if (!isTimerRunning && !isMoving) {
+                    toggleTimerState();
+                }
+            }
+        });
+
+        document.getElementById('timer-tap-area').addEventListener('click', () => {
+            toggleTimerState();
+            if (!isTimerRunning) {
+                recordSolvedTime();
+            }
+        });
+
+        document.getElementById('reset-camera-btn').addEventListener('click', () => {
+            camera.position.set(6, 5, 8);
+            controls.target.set(0, 0, 0);
+            controls.update();
+            showToast("Camera returned to standard viewpoint.", "info");
+        });
+
+        // -------------------------------------------------------------
+        // Interactivity Bindings
+        // -------------------------------------------------------------
+        const helpBtn = document.getElementById('help-btn');
+        const themeBtn = document.getElementById('theme-btn');
+        const closeHelpBtn = document.getElementById('close-help-btn');
+        const closePaletteBtn = document.getElementById('close-palette-btn');
+        const helpOverlay = document.getElementById('instructions-overlay');
+        const paletteOverlay = document.getElementById('palette-overlay');
+
+        helpBtn.addEventListener('click', () => helpOverlay.classList.remove('hidden'));
+        closeHelpBtn.addEventListener('click', () => helpOverlay.classList.add('hidden'));
+
+        themeBtn.addEventListener('click', () => paletteOverlay.classList.remove('hidden'));
+        closePaletteBtn.addEventListener('click', () => paletteOverlay.classList.add('hidden'));
+
+        [helpOverlay, paletteOverlay].forEach(overlay => {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) overlay.classList.add('hidden');
+            });
+        });
+
+        const speedSlider = document.getElementById('speed-slider');
+        const speedDisplay = document.getElementById('speed-display');
+        const speedValLabel = document.getElementById('slider-val-label');
+
+        speedSlider.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            currentMoveSpeed = val;
+
+            if (val <= 150) {
+                speedDisplay.innerText = "Lightning Fast";
+                speedValLabel.innerText = `Fast (${val}ms)`;
+            } else if (val <= 300) {
+                speedDisplay.innerText = "Normal";
+                speedValLabel.innerText = `Medium (${val}ms)`;
+            } else {
+                speedDisplay.innerText = "Cinematic Flow";
+                speedValLabel.innerText = `Smooth (${val}ms)`;
+            }
+        });
+
+        document.getElementById('scramble-btn').addEventListener('click', generateScramble);
+        document.getElementById('solve-btn').addEventListener('click', startSolveHistoryRewind);
+        document.getElementById('instant-reset-btn').addEventListener('click', instantFullReset);
+        document.getElementById('clear-solves-btn').addEventListener('click', () => {
+            solveTimes = [];
+            rebuildSessionStats();
+            showToast("Solve history cleared.", "info");
+        });
+
+        function showToast(msg, type = "info") {
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-6 right-6 px-4 py-3 rounded-2xl border text-xs font-bold tracking-wide shadow-2xl transition-all duration-300 transform translate-y-10 opacity-0 z-50 flex items-center gap-2`;
+            
+            if (type === "success") {
+                toast.classList.add("bg-emerald-950/90", "border-emerald-500/40", "text-emerald-400");
+                toast.innerHTML = `<i data-lucide="check-circle" class="w-4 h-4"></i> ${msg}`;
+            } else if (type === "error") {
+                toast.classList.add("bg-rose-950/90", "border-rose-500/40", "text-rose-400");
+                toast.innerHTML = `<i data-lucide="alert-circle" class="w-4 h-4"></i> ${msg}`;
+            } else {
+                toast.classList.add("bg-gray-900/95", "border-gray-800", "text-indigo-400");
+                toast.innerHTML = `<i data-lucide="info" class="w-4 h-4"></i> ${msg}`;
+            }
+
+            document.body.appendChild(toast);
+            lucide.createIcons();
+
+            setTimeout(() => {
+                toast.classList.remove("translate-y-10", "opacity-0");
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add("translate-y-10", "opacity-0");
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        window.onload = function() {
+            initThree();
+        };
+    </script>
+</body>
+</html>
