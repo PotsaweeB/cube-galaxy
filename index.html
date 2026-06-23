@@ -1,0 +1,1513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Cosmic Rubik's Cube - Zero-G Space Player & Timer</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #030308;
+        }
+        .mono-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Custom scrollbars for clean UI */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #090915;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1f1f3a;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #31315c;
+        }
+    </style>
+</head>
+<body class="text-gray-100 overflow-x-hidden min-h-screen flex flex-col relative select-none">
+
+    <!-- Cosmic Top Navigation Bar -->
+    <header class="border-b border-indigo-950/40 bg-black/60 backdrop-blur-md px-6 py-4 flex items-center justify-between z-20 sticky top-0">
+        <div class="flex items-center space-x-3">
+            <div class="bg-gradient-to-tr from-violet-600 via-indigo-600 to-cyan-500 p-2.5 rounded-xl shadow-lg shadow-indigo-500/10">
+                <svg class="w-6 h-6 text-white animate-spin-slow" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="animation-duration: 10s;">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-indigo-200 to-cyan-300">GalaxyCube 3D</h1>
+                <p class="text-xs text-indigo-300/70">Zero-Gravity Rubik's Cube floating in deep space</p>
+            </div>
+        </div>
+        
+        <div class="flex items-center space-x-3">
+            <button id="help-btn" class="p-2.5 hover:bg-white/5 rounded-xl text-indigo-200 hover:text-white transition-all flex items-center gap-1.5 text-xs font-semibold border border-indigo-950/50" title="Control details">
+                <i data-lucide="help-circle" class="w-4 h-4"></i>
+                <span class="hidden md:inline">Instructions</span>
+            </button>
+            <button id="theme-btn" class="p-2.5 hover:bg-white/5 rounded-xl text-indigo-200 hover:text-white transition-all flex items-center gap-1.5 text-xs font-semibold border border-indigo-950/50" title="Sticker color palette">
+                <i data-lucide="palette" class="w-4 h-4"></i>
+                <span class="hidden md:inline">Palettes</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 grid grid-cols-1 xl:grid-cols-12 gap-6 p-4 md:p-6 max-w-7xl mx-auto w-full z-10">
+        
+        <!-- Left Column: Unrestricted 3D Viewport Space -->
+        <section class="xl:col-span-8 flex flex-col space-y-4">
+            
+            <!-- Scramble displays -->
+            <div class="bg-black/40 border border-indigo-950/50 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 backdrop-blur-sm">
+                <div class="flex-1">
+                    <span class="text-xs font-bold uppercase tracking-widest text-indigo-300 bg-indigo-500/10 px-2.5 py-1 rounded-full">Scramble Algorithm</span>
+                    <div id="scramble-display" class="mono-font text-sm md:text-base font-bold text-gray-200 mt-2 tracking-wide leading-relaxed">
+                        Ready! Click Scramble or drag face stickers to play.
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2 w-full md:w-auto shrink-0">
+                    <button id="scramble-btn" class="w-full md:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold shadow-lg shadow-indigo-600/30 transition-all active:scale-95 flex items-center justify-center gap-2">
+                        <i data-lucide="shuffle" class="w-4 h-4"></i>
+                        Scramble
+                    </button>
+                    <button id="solve-btn" class="w-full md:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-semibold shadow-lg shadow-emerald-600/30 transition-all active:scale-95 flex items-center justify-center gap-2" title="Rewinds history steps to solve">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                        Rewind
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3D Cosmos Viewport Canvas -->
+            <div class="relative bg-black/60 border border-indigo-950/50 rounded-3xl overflow-hidden aspect-square md:aspect-video flex items-center justify-center group shadow-2xl shadow-indigo-950/20 min-h-[380px] md:min-h-[500px]">
+                
+                <!-- Helper overlay guides -->
+                <div class="absolute top-4 left-4 flex flex-col gap-2 z-10 pointer-events-none select-none">
+                    <div class="flex items-center gap-2 bg-black/80 backdrop-blur px-3 py-1.5 rounded-lg border border-indigo-950/50 text-xs text-indigo-200">
+                        <span class="w-2 h-2 bg-cyan-400 rounded-full animate-ping"></span>
+                        <span>Drag stickers horizontally or vertically to turn layers</span>
+                    </div>
+                    <div class="flex items-center gap-2 bg-black/80 backdrop-blur px-3 py-1.5 rounded-lg border border-indigo-950/50 text-xs text-indigo-200">
+                        <i data-lucide="orbit" class="w-3.5 h-3.5 text-violet-400"></i>
+                        <span>Drag empty dark space to orbit 360° around the galaxy</span>
+                    </div>
+                </div>
+
+                <div class="absolute top-4 right-4 z-10 flex gap-2">
+                    <button id="reset-camera-btn" class="bg-black/80 hover:bg-black/90 backdrop-blur p-2.5 rounded-xl border border-indigo-950/50 text-gray-300 hover:text-white transition-all flex items-center gap-1.5 text-xs" title="Reset View">
+                        <i data-lucide="maximize-2" class="w-4 h-4"></i>
+                        Reset Camera
+                    </button>
+                </div>
+
+                <!-- ThreeJS Canvas Container -->
+                <div id="cube-canvas-container" class="w-full h-full cursor-grab active:cursor-grabbing" style="touch-action: none;"></div>
+
+                <!-- Floating Badge status -->
+                <div class="absolute bottom-4 left-4 z-10 select-none">
+                    <div id="solved-status-badge" class="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-3 py-1.5 rounded-xl font-bold text-xs tracking-wider">
+                        <span class="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                        CUBE SOLVED
+                    </div>
+                </div>
+
+                <!-- Gravity mode indicator -->
+                <div class="absolute bottom-4 right-4 z-10 bg-black/80 backdrop-blur px-3 py-1.5 rounded-lg border border-indigo-950/50 text-xs text-indigo-200 flex items-center gap-1.5">
+                    <span class="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></span>
+                    <span>Zero-G Auto-Drift: Active</span>
+                </div>
+            </div>
+
+            <!-- Manual Rotation Commands -->
+            <div class="bg-black/40 border border-indigo-950/50 rounded-2xl p-4 flex flex-col space-y-4 backdrop-blur-sm">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-indigo-300 flex items-center gap-2">
+                        <i data-lucide="cpu" class="w-4 h-4 text-violet-400"></i>
+                        Command Console Rotations
+                    </h3>
+                    <span class="text-[10px] text-indigo-400/80 font-mono">Click to turn clockwise • Shift+Click or Prime buttons for counter-clockwise</span>
+                </div>
+
+                <div class="grid grid-cols-6 gap-2">
+                    <button onclick="triggerMove('U')" class="group bg-indigo-950/15 hover:bg-indigo-950/40 border border-indigo-950/30 py-2.5 rounded-xl transition-all flex flex-col items-center">
+                        <span class="text-sm font-bold text-white group-hover:scale-110 transition-transform">U</span>
+                        <span class="text-[9px] text-indigo-300 mt-0.5">Up</span>
+                    </button>
+                    <button onclick="triggerMove('D')" class="group bg-indigo-950/15 hover:bg-indigo-950/40 border border-indigo-950/30 py-2.5 rounded-xl transition-all flex flex-col items-center">
+                        <span class="text-sm font-bold text-white group-hover:scale-110 transition-transform">D</span>
+                        <span class="text-[9px] text-indigo-300 mt-0.5">Down</span>
+                    </button>
+                    <button onclick="triggerMove('L')" class="group bg-indigo-950/15 hover:bg-indigo-950/40 border border-indigo-950/30 py-2.5 rounded-xl transition-all flex flex-col items-center">
+                        <span class="text-sm font-bold text-white group-hover:scale-110 transition-transform">L</span>
+                        <span class="text-[9px] text-indigo-300 mt-0.5">Left</span>
+                    </button>
+                    <button onclick="triggerMove('R')" class="group bg-indigo-950/15 hover:bg-indigo-950/40 border border-indigo-950/30 py-2.5 rounded-xl transition-all flex flex-col items-center">
+                        <span class="text-sm font-bold text-white group-hover:scale-110 transition-transform">R</span>
+                        <span class="text-[9px] text-indigo-300 mt-0.5">Right</span>
+                    </button>
+                    <button onclick="triggerMove('F')" class="group bg-indigo-950/15 hover:bg-indigo-950/40 border border-indigo-950/30 py-2.5 rounded-xl transition-all flex flex-col items-center">
+                        <span class="text-sm font-bold text-white group-hover:scale-110 transition-transform">F</span>
+                        <span class="text-[9px] text-indigo-300 mt-0.5">Front</span>
+                    </button>
+                    <button onclick="triggerMove('B')" class="group bg-indigo-950/15 hover:bg-indigo-950/40 border border-indigo-950/30 py-2.5 rounded-xl transition-all flex flex-col items-center">
+                        <span class="text-sm font-bold text-white group-hover:scale-110 transition-transform">B</span>
+                        <span class="text-[9px] text-indigo-300 mt-0.5">Back</span>
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-6 gap-2">
+                    <button onclick="triggerMove('U\'')" class="bg-violet-950/10 hover:bg-violet-950/30 border border-violet-950/30 py-2 rounded-xl transition-all text-xs font-bold text-violet-300">U'</button>
+                    <button onclick="triggerMove('D\'')" class="bg-violet-950/10 hover:bg-violet-950/30 border border-violet-950/30 py-2 rounded-xl transition-all text-xs font-bold text-violet-300">D'</button>
+                    <button onclick="triggerMove('L\'')" class="bg-violet-950/10 hover:bg-violet-950/30 border border-violet-950/30 py-2 rounded-xl transition-all text-xs font-bold text-violet-300">L'</button>
+                    <button onclick="triggerMove('R\'')" class="bg-violet-950/10 hover:bg-violet-950/30 border border-violet-950/30 py-2 rounded-xl transition-all text-xs font-bold text-violet-300">R'</button>
+                    <button onclick="triggerMove('F\'')" class="bg-violet-950/10 hover:bg-violet-950/30 border border-violet-950/30 py-2 rounded-xl transition-all text-xs font-bold text-violet-300">F'</button>
+                    <button onclick="triggerMove('B\'')" class="bg-violet-950/10 hover:bg-violet-950/30 border border-violet-950/30 py-2 rounded-xl transition-all text-xs font-bold text-violet-300">B'</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Column: Speedcubing Stopwatch & Stats -->
+        <aside class="xl:col-span-4 flex flex-col space-y-6">
+            
+            <div id="timer-card" class="bg-black/40 border border-indigo-950/50 rounded-3xl p-6 flex flex-col items-center justify-center relative overflow-hidden group shadow-xl backdrop-blur-sm">
+                
+                <div class="absolute -top-12 -right-12 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl group-hover:bg-indigo-500/20 transition-all"></div>
+                
+                <span class="text-xs font-bold uppercase tracking-widest text-indigo-300 flex items-center gap-1.5 self-start mb-2">
+                    <i data-lucide="timer" class="w-4 h-4"></i>
+                    Space Stopwatch
+                </span>
+                
+                <!-- Digital Readout -->
+                <div id="timer-display" class="mono-font text-5xl md:text-6xl font-extrabold tracking-tight text-white my-6 tabular-nums select-none transition-all">
+                    00:00.00
+                </div>
+
+                <p id="timer-instruction" class="text-xs text-indigo-300/70 text-center mb-6">
+                    Press <span class="px-2 py-0.5 bg-indigo-950/45 border border-indigo-900/30 rounded text-indigo-200">Spacebar</span> or tap the panel below to start/stop.
+                </p>
+
+                <!-- Interactive tap trigger -->
+                <button id="timer-tap-area" class="w-full py-4 bg-indigo-950/20 hover:bg-indigo-950/45 border border-indigo-900/40 rounded-2xl font-bold text-sm tracking-wide text-indigo-100 hover:text-cyan-300 transition-all flex items-center justify-center gap-2 shadow-inner">
+                    <i data-lucide="play" class="w-4 h-4"></i>
+                    Tap to Start / Stop Timer
+                </button>
+
+                <!-- Averages/Performance values -->
+                <div class="grid grid-cols-3 gap-2 w-full mt-6 pt-6 border-t border-indigo-950/60 text-center">
+                    <div>
+                        <span class="block text-[9px] text-indigo-400 uppercase font-bold tracking-wider">PB Single</span>
+                        <span id="stat-best" class="mono-font font-bold text-indigo-200 text-sm">-</span>
+                    </div>
+                    <div>
+                        <span class="block text-[9px] text-indigo-400 uppercase font-bold tracking-wider">Ao5 (Avg)</span>
+                        <span id="stat-ao5" class="mono-font font-bold text-indigo-200 text-sm">-</span>
+                    </div>
+                    <div>
+                        <span class="block text-[9px] text-indigo-400 uppercase font-bold tracking-wider">Ao12 (Avg)</span>
+                        <span id="stat-ao12" class="mono-font font-bold text-indigo-200 text-sm">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Solve history log -->
+            <div class="bg-black/40 border border-indigo-950/50 rounded-3xl p-6 flex flex-col space-y-4 backdrop-blur-sm">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
+                        <i data-lucide="list" class="w-4 h-4 text-violet-400"></i>
+                        Space Log History
+                    </h3>
+                    <button id="clear-solves-btn" class="text-[11px] text-rose-400 hover:text-rose-300 transition-all flex items-center gap-1">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        Clear
+                    </button>
+                </div>
+
+                <div class="max-h-40 overflow-y-auto pr-2 space-y-2" id="solves-list-container">
+                    <div class="text-xs text-indigo-400/50 italic text-center py-4">Zero logs recorded. Complete a solve or stop the stopwatch!</div>
+                </div>
+            </div>
+
+            <!-- Interface controls -->
+            <div class="bg-black/40 border border-indigo-950/50 rounded-3xl p-6 flex flex-col space-y-4 backdrop-blur-sm">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
+                    <i data-lucide="sliders-horizontal" class="w-4 h-4 text-violet-400"></i>
+                    Atmospheric Controls
+                </h3>
+
+                <!-- Animation speed -->
+                <div>
+                    <label class="text-xs text-indigo-300/80 block mb-2 flex justify-between">
+                        <span>Rotation Animation Speed</span>
+                        <span id="slider-val-label" class="text-cyan-400 font-bold">Normal (250ms)</span>
+                    </label>
+                    <input type="range" id="speed-slider" min="100" max="600" step="50" value="250" class="w-full accent-indigo-500 h-1 bg-indigo-950 rounded-lg appearance-none cursor-pointer">
+                    <div class="flex justify-between text-[9px] text-indigo-500 mt-1 select-none">
+                        <span>Speedy (100ms)</span>
+                        <span>Zero-Gravity Flow (600ms)</span>
+                    </div>
+                </div>
+
+                <button id="instant-reset-btn" class="w-full py-3 bg-rose-950/20 hover:bg-rose-950/30 border border-rose-900/30 hover:border-rose-800 text-rose-300 rounded-2xl text-xs font-semibold tracking-wide transition-all flex items-center justify-center gap-2">
+                    <i data-lucide="refresh-ccw" class="w-3.5 h-3.5"></i>
+                    Instant Solve / Hard Reset
+                </button>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Palette Picker modal -->
+    <div id="palette-overlay" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-slate-950 border border-indigo-950 max-w-md w-full mx-4 rounded-3xl p-6 shadow-2xl relative">
+            <button id="close-palette-btn" class="absolute top-4 right-4 text-indigo-300 hover:text-white transition-all">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+            <h2 class="text-lg font-bold mb-1 flex items-center gap-2">
+                <i data-lucide="palette" class="w-5 h-5 text-indigo-400"></i>
+                Cosmic Sticker Theme
+            </h2>
+            <p class="text-xs text-indigo-300/60 mb-6 font-semibold">Change the visual schema of the floating starlight sticker tiles instantly.</p>
+
+            <div class="space-y-3">
+                <button onclick="setCubePalette('classic')" class="w-full p-4 bg-indigo-950/10 hover:bg-indigo-950/30 border border-indigo-950/40 rounded-2xl flex items-center justify-between text-left transition-all">
+                    <div>
+                        <span class="font-semibold block text-sm">Classic Standard</span>
+                        <span class="text-xs text-indigo-300/60">The traditional speedcube visual colors.</span>
+                    </div>
+                    <div class="flex space-x-1">
+                        <span class="w-3.5 h-3.5 bg-red-600 rounded"></span>
+                        <span class="w-3.5 h-3.5 bg-green-600 rounded"></span>
+                        <span class="w-3.5 h-3.5 bg-blue-600 rounded"></span>
+                    </div>
+                </button>
+
+                <button onclick="setCubePalette('pastel')" class="w-full p-4 bg-indigo-950/10 hover:bg-indigo-950/30 border border-indigo-950/40 rounded-2xl flex items-center justify-between text-left transition-all">
+                    <div>
+                        <span class="font-semibold block text-sm">Space Nebula Pastel</span>
+                        <span class="text-xs text-indigo-300/60">Calming, highly aesthetic pastel colors.</span>
+                    </div>
+                    <div class="flex space-x-1">
+                        <span class="w-3.5 h-3.5 bg-rose-400 rounded"></span>
+                        <span class="w-3.5 h-3.5 bg-emerald-300 rounded"></span>
+                        <span class="w-3.5 h-3.5 bg-sky-300 rounded"></span>
+                    </div>
+                </button>
+
+                <button onclick="setCubePalette('neon')" class="w-full p-4 bg-indigo-950/10 hover:bg-indigo-950/30 border border-indigo-950/40 rounded-2xl flex items-center justify-between text-left transition-all">
+                    <div>
+                        <span class="font-semibold block text-sm">Supernova Neon</span>
+                        <span class="text-xs text-indigo-300/60">Vibrant, ultra-glowing radioactive colors.</span>
+                    </div>
+                    <div class="flex space-x-1">
+                        <span class="w-3.5 h-3.5 bg-fuchsia-500 rounded"></span>
+                        <span class="w-3.5 h-3.5 bg-lime-400 rounded"></span>
+                        <span class="w-3.5 h-3.5 bg-cyan-400 rounded"></span>
+                    </div>
+                </button>
+
+                <button onclick="setCubePalette('sunset')" class="w-full p-4 bg-indigo-950/10 hover:bg-indigo-950/30 border border-indigo-950/40 rounded-2xl flex items-center justify-between text-left transition-all">
+                    <div>
+                        <span class="font-semibold block text-sm">Martian Sunset</span>
+                        <span class="text-xs text-indigo-300/60">Cozy, solar amber and deep stardust shades.</span>
+                    </div>
+                    <div class="flex space-x-1">
+                        <span class="w-3.5 h-3.5 bg-amber-600 rounded"></span>
+                        <span class="w-3.5 h-3.5 bg-amber-400 rounded"></span>
+                        <span class="w-3.5 h-3.5 bg-rose-600 rounded"></span>
+                    </div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Instructions Guide modal -->
+    <div id="instructions-overlay" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-slate-950 border border-indigo-950 max-w-lg w-full mx-4 rounded-3xl p-6 shadow-2xl relative max-h-[85vh] overflow-y-auto">
+            <button id="close-help-btn" class="absolute top-4 right-4 text-indigo-300 hover:text-white transition-all">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+            <h2 class="text-lg font-bold mb-1 flex items-center gap-2">
+                <i data-lucide="help-circle" class="w-5 h-5 text-indigo-400"></i>
+                Cosmic Controller Manual
+            </h2>
+            <p class="text-xs text-indigo-300/60 mb-6 font-semibold font-mono">Unrestricted Navigation & Swipe mechanics</p>
+
+            <div class="space-y-4 text-sm text-indigo-100">
+                <div>
+                    <h4 class="font-bold text-white mb-1.5 flex items-center gap-1.5 text-xs uppercase tracking-wider text-indigo-400">
+                        <i data-lucide="stars" class="w-4 h-4"></i> Unrestricted Gravity View
+                    </h4>
+                    <p class="text-xs leading-relaxed text-indigo-200">
+                        Drag your cursor on the **empty starry sky background** to orbit freely 360° around the floating speedcube. You can easily get the yellow or white faces completely on top at any angle, simulating a weightless galaxy tumble.
+                    </p>
+                </div>
+
+                <div>
+                    <h4 class="font-bold text-white mb-1.5 flex items-center gap-1.5 text-xs uppercase tracking-wider text-indigo-400">
+                        <i data-lucide="swatchbook" class="w-4 h-4"></i> Flawless Swipe & Drag Mechanics
+                    </h4>
+                    <p class="text-xs leading-relaxed text-indigo-200">
+                        Drag face stickers directly in any screen direction (horizontally or vertically) to spin outer and inner layers. The math projects vectors based on the exact active angle, preventing the rotation lockups seen in basic engines.
+                    </p>
+                </div>
+
+                <div>
+                    <h4 class="font-bold text-white mb-1.5 flex items-center gap-1.5 text-xs uppercase tracking-wider text-indigo-400">
+                        <i data-lucide="keyboard" class="w-4 h-4"></i> Keyboard Shortcuts
+                    </h4>
+                    <p class="text-xs leading-relaxed mb-2 text-indigo-200">
+                        Use standard key presses to rotate clockwise:
+                    </p>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div class="flex justify-between p-2 bg-indigo-950/20 rounded border border-indigo-950/30"><span class="font-mono text-indigo-400 font-bold">U</span> <span>Up (White)</span></div>
+                        <div class="flex justify-between p-2 bg-indigo-950/20 rounded border border-indigo-950/30"><span class="font-mono text-indigo-400 font-bold">D</span> <span>Down (Yellow)</span></div>
+                        <div class="flex justify-between p-2 bg-indigo-950/20 rounded border border-indigo-950/30"><span class="font-mono text-indigo-400 font-bold">L</span> <span>Left (Orange)</span></div>
+                        <div class="flex justify-between p-2 bg-indigo-950/20 rounded border border-indigo-950/30"><span class="font-mono text-indigo-400 font-bold">R</span> <span>Right (Red)</span></div>
+                        <div class="flex justify-between p-2 bg-indigo-950/20 rounded border border-indigo-950/30"><span class="font-mono text-indigo-400 font-bold">F</span> <span>Front (Green)</span></div>
+                        <div class="flex justify-between p-2 bg-indigo-950/20 rounded border border-indigo-950/30"><span class="font-mono text-indigo-400 font-bold">B</span> <span>Back (Blue)</span></div>
+                    </div>
+                    <p class="text-[11px] text-amber-400/90 mt-2 font-semibold">
+                        💡 **Protip:** Hold **Shift** while typing keys to execute prime counter-clockwise turns (e.g., <kbd class="px-1 py-0.5 bg-indigo-900/40 rounded">Shift + R</kbd> runs $R'$).
+                    </p>
+                </div>
+
+                <div>
+                    <h4 class="font-bold text-white mb-1.5 flex items-center gap-1.5 text-xs uppercase tracking-wider text-indigo-400">
+                        <i data-lucide="sparkles" class="w-4 h-4"></i> Speedrun Algorithms
+                    </h4>
+                    <p class="text-xs text-indigo-200 mb-2">
+                        Click below to demonstrate standard speedcube algorithm flow:
+                    </p>
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between p-2.5 bg-indigo-950/25 border border-indigo-950/35 rounded-xl">
+                            <div>
+                                <span class="block font-bold text-xs">Standard "Sexy Move"</span>
+                                <span class="mono-font text-[11px] text-indigo-300 font-bold">R U R' U'</span>
+                            </div>
+                            <button onclick="demoAlgo(['R', 'U', 'R\'', 'U\''])" class="bg-indigo-600/30 hover:bg-indigo-600 text-indigo-200 hover:text-white px-3 py-1 rounded-lg text-xs font-bold transition-all">Animate</button>
+                        </div>
+                        <div class="flex items-center justify-between p-2.5 bg-indigo-950/25 border border-indigo-950/35 rounded-xl">
+                            <div>
+                                <span class="block font-bold text-xs">Standard "Sledgehammer"</span>
+                                <span class="mono-font text-[11px] text-indigo-300 font-bold">R' F R F'</span>
+                            </div>
+                            <button onclick="demoAlgo(['R\'', 'F', 'R', 'F\''])" class="bg-indigo-600/30 hover:bg-indigo-600 text-indigo-200 hover:text-white px-3 py-1 rounded-lg text-xs font-bold transition-all">Animate</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // -------------------------------------------------------------
+        // Palettes Configuration
+        // -------------------------------------------------------------
+        const PALETTES = {
+            classic: {
+                R: 0xDC2626, // Red
+                L: 0xEA580C, // Orange
+                U: 0xF8FAFC, // White
+                D: 0xEAB308, // Yellow
+                F: 0x16A34A, // Green
+                B: 0x2563EB, // Blue
+                inner: 0x050508 // Obsidian Matte Black
+            },
+            pastel: {
+                R: 0xFB7185, // Rose Pastel
+                L: 0xFDBA74, // Peach
+                U: 0xF1F5F9, // Soft Pearl White
+                D: 0xFEF08A, // Soft Lemon Yellow
+                F: 0x86EFAC, // Mint Green
+                B: 0x93C5FD, // Soft Sky Blue
+                inner: 0x0a0a12 // Midnight Dark Blue
+            },
+            neon: {
+                R: 0xFF0066, // Fluorescent Pink
+                L: 0xFF6600, // Electric Orange
+                U: 0xE6FFFF, // Cyan-White Glow
+                D: 0xDDFF00, // Acid Yellow
+                F: 0x00FF66, // Laser Green
+                B: 0x00F0FF, // Cosmic Cyan Blue
+                inner: 0x010205 // Hyper Dark Obsidian
+            },
+            sunset: {
+                R: 0x991B1B, // Twilight Ruby Red
+                L: 0xD97706, // Solar Flare Amber
+                U: 0xFFF7ED, // Lunar Glow White
+                D: 0xF59E0B, // Solar Sun Yellow
+                F: 0xBE123C, // Warm Nebula Crimson
+                B: 0x1E1B4B, // Interstellar Indigo Blue
+                inner: 0x04050a // Interstellar Void Gray
+            }
+        };
+
+        let activePaletteName = 'classic';
+        let currentPalette = PALETTES[activePaletteName];
+
+        // -------------------------------------------------------------
+        // Three.js State variables
+        // -------------------------------------------------------------
+        let scene, camera, renderer, controls;
+        let cubeContainer; // Container to hold all cubies for floating weightless drifting
+        let cubies = []; // Array of 27 cubie meshes
+        let isMoving = false;
+        let moveQueue = [];
+        let moveHistory = [];
+        let currentMoveSpeed = 250;
+
+        // Container selector
+        const container = document.getElementById('cube-canvas-container');
+
+        // -------------------------------------------------------------
+        // Sticker Drag and Swipe Variables
+        // -------------------------------------------------------------
+        let isPointerDown = false;
+        let pointerStart = { x: 0, y: 0 };
+        let clickedCubie = null;
+        let clickedSticker = null; // References specific sticker mesh hit
+        let clickedPoint = null;  // Intersection point in world coordinate
+        let clickedNormal = null; // Face world normal
+
+        // -------------------------------------------------------------
+        // Speedcubing Timer Logic State
+        // -------------------------------------------------------------
+        let timerInterval = null;
+        let timerStart = null;
+        let isTimerRunning = false;
+        let holdsSpace = false;
+        let solveTimes = []; // Array of float milliseconds
+
+        function initThree() {
+            // Scene
+            scene = new THREE.Scene();
+
+            // Camera Setup - Unrestricted 360 orbital camera
+            camera = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 0.1, 150);
+            camera.position.set(7, 6, 9);
+
+            // WebGL Renderer with Shadow mapping
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Fully Unrestricted Orbit Camera
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.minDistance = 3.5;
+            controls.maxDistance = 25;
+            controls.enablePan = false; 
+            controls.maxPolarAngle = Math.PI; // Completely unrestricted poles for free galaxy orbit
+
+            // Cosmic Lights Setup
+            const hemiLight = new THREE.HemisphereLight(0xffffff, 0x05051a, 0.8);
+            scene.add(hemiLight);
+
+            // Strong directional light casting starlight shadows
+            const starLight = new THREE.DirectionalLight(0xd9f2ff, 1.4);
+            starLight.position.set(10, 15, 10);
+            starLight.castShadow = true;
+            starLight.shadow.mapSize.width = 1024;
+            starLight.shadow.mapSize.height = 1024;
+            starLight.shadow.camera.near = 0.5;
+            starLight.shadow.camera.far = 30;
+            starLight.shadow.bias = -0.0005;
+            scene.add(starLight);
+
+            // Warm and cold pastel nebula glow highlights
+            const nebulaPurple = new THREE.DirectionalLight(0xa855f7, 0.6);
+            nebulaPurple.position.set(-8, 5, -8);
+            scene.add(nebulaPurple);
+
+            const nebulaCyan = new THREE.DirectionalLight(0x06b6d4, 0.4);
+            nebulaCyan.position.set(5, -5, -6);
+            scene.add(nebulaCyan);
+
+            // Create zero-G weightless drift container
+            cubeContainer = new THREE.Group();
+            scene.add(cubeContainer);
+
+            // Build starry backdrop space
+            buildCosmosBackground();
+
+            // Build initial Rubik's Cube
+            buildRubiksCube();
+
+            // Set up pointer event handlers for math-precise direct sticker dragging
+            setupInteractivePointerDrag();
+
+            // Run central render logic loops
+            animateLoop();
+        }
+
+        function buildCosmosBackground() {
+            // Starfield particle layout
+            const starCount = 1800;
+            const starGeometry = new THREE.BufferGeometry();
+            const starPositions = new Float32Array(starCount * 3);
+            const starColors = new Float32Array(starCount * 3);
+
+            for (let i = 0; i < starCount; i++) {
+                // Scatter in a shell far around scene
+                const radius = 40 + Math.random() * 30;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos((Math.random() * 2) - 1);
+
+                starPositions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+                starPositions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+                starPositions[i * 3 + 2] = radius * Math.cos(phi);
+
+                // Twinkling pastel colors (cool blues, neon violet, pure white stars)
+                const roll = Math.random();
+                if (roll < 0.4) {
+                    // Ice Cyan Blue
+                    starColors[i * 3] = 0.65;
+                    starColors[i * 3 + 1] = 0.85;
+                    starColors[i * 3 + 2] = 1.0;
+                } else if (roll < 0.7) {
+                    // Soft Neon Violet Pink
+                    starColors[i * 3] = 0.9;
+                    starColors[i * 3 + 1] = 0.65;
+                    starColors[i * 3 + 2] = 1.0;
+                } else {
+                    // Hot Stellar White
+                    starColors[i * 3] = 1.0;
+                    starColors[i * 3 + 1] = 1.0;
+                    starColors[i * 3 + 2] = 1.0;
+                }
+            }
+
+            starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+            starGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+
+            const starMaterial = new THREE.PointsMaterial({
+                size: 0.16,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.95,
+                blending: THREE.AdditiveBlending
+            });
+
+            const starryCloud = new THREE.Points(starGeometry, starMaterial);
+            scene.add(starryCloud);
+            scene.userData.starryCloud = starryCloud;
+
+            // Generate gaseous nebulas using soft large point clouds
+            const nebulaCount = 18;
+            const nebulaGeo = new THREE.BufferGeometry();
+            const nebulaPositions = new Float32Array(nebulaCount * 3);
+            const nebulaColors = new Float32Array(nebulaCount * 3);
+
+            for (let i = 0; i < nebulaCount; i++) {
+                // Drifting outer rings
+                const dist = 18 + Math.random() * 15;
+                const ang = Math.random() * Math.PI * 2;
+                nebulaPositions[i * 3] = Math.cos(ang) * dist;
+                nebulaPositions[i * 3 + 1] = (Math.random() - 0.5) * 12;
+                nebulaPositions[i * 3 + 2] = Math.sin(ang) * dist;
+
+                // Alternate glowing purple, rose sunset, deep indigo dust clouds
+                if (i % 3 === 0) {
+                    nebulaColors[i * 3] = 0.4;     // R
+                    nebulaColors[i * 3 + 1] = 0.05; // G
+                    nebulaColors[i * 3 + 2] = 0.8;  // B
+                } else if (i % 3 === 1) {
+                    nebulaColors[i * 3] = 0.7;
+                    nebulaColors[i * 3 + 1] = 0.05;
+                    nebulaColors[i * 3 + 2] = 0.35;
+                } else {
+                    nebulaColors[i * 3] = 0.05;
+                    nebulaColors[i * 3 + 1] = 0.35;
+                    nebulaColors[i * 3 + 2] = 0.7;
+                }
+            }
+
+            nebulaGeo.setAttribute('position', new THREE.BufferAttribute(nebulaPositions, 3));
+            nebulaGeo.setAttribute('color', new THREE.BufferAttribute(nebulaColors, 3));
+
+            // Soft atmospheric glowing points
+            const nebulaMaterial = new THREE.PointsMaterial({
+                size: 15,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.15,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            const interstellarNebulas = new THREE.Points(nebulaGeo, nebulaMaterial);
+            scene.add(interstellarNebulas);
+            scene.userData.nebula = interstellarNebulas;
+        }
+
+        function buildRubiksCube() {
+            // Remove existing blocks
+            cubies.forEach(cubie => cubeContainer.remove(cubie));
+            cubies = [];
+
+            const offsets = [-1, 0, 1];
+
+            // Outer coordinate iteration loops
+            for (let x of offsets) {
+                for (let y of offsets) {
+                    for (let z of offsets) {
+                        
+                        // Solid Matte Plastic Body
+                        const bodyGeom = new THREE.BoxGeometry(0.93, 0.93, 0.93);
+                        const bodyMat = new THREE.MeshPhysicalMaterial({
+                            color: currentPalette.inner,
+                            roughness: 0.65,
+                            metalness: 0.8,
+                            clearcoat: 0.2
+                        });
+
+                        const cubieGroup = new THREE.Group();
+                        const cubieBody = new THREE.Mesh(bodyGeom, bodyMat);
+                        cubieBody.castShadow = true;
+                        cubieBody.receiveShadow = true;
+                        cubieGroup.add(cubieBody);
+
+                        // Glossy elevated sticker tiles
+                        const stickerHeight = 0.035;
+                        const stickerWidth = 0.78;
+                        const stickerOffset = 0.465;
+
+                        // Premium glowing glassy clearcoat physical properties
+                        const stickerPhysProps = {
+                            roughness: 0.05,
+                            metalness: 0.1,
+                            clearcoat: 1.0,
+                            clearcoatRoughness: 0.02,
+                            emissiveIntensity: 0.06 // Soft neon self-illumination in deep space
+                        };
+
+                        // Right (+X) - Red
+                        if (x === 1) {
+                            const geom = new THREE.BoxGeometry(stickerHeight, stickerWidth, stickerWidth);
+                            const mat = new THREE.MeshPhysicalMaterial({ color: currentPalette.R, emissive: currentPalette.R, ...stickerPhysProps });
+                            const tile = new THREE.Mesh(geom, mat);
+                            tile.position.set(stickerOffset, 0, 0);
+                            
+                            // Attach local coordinate metadata for world space motion projection
+                            tile.userData = {
+                                localNormal: new THREE.Vector3(1, 0, 0),
+                                motionAxes: [new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)]
+                            };
+                            cubieGroup.add(tile);
+                        }
+                        // Left (-X) - Orange
+                        if (x === -1) {
+                            const geom = new THREE.BoxGeometry(stickerHeight, stickerWidth, stickerWidth);
+                            const mat = new THREE.MeshPhysicalMaterial({ color: currentPalette.L, emissive: currentPalette.L, ...stickerPhysProps });
+                            const tile = new THREE.Mesh(geom, mat);
+                            tile.position.set(-stickerOffset, 0, 0);
+                            
+                            tile.userData = {
+                                localNormal: new THREE.Vector3(-1, 0, 0),
+                                motionAxes: [new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)]
+                            };
+                            cubieGroup.add(tile);
+                        }
+                        // Top (+Y) - White
+                        if (y === 1) {
+                            const geom = new THREE.BoxGeometry(stickerWidth, stickerHeight, stickerWidth);
+                            const mat = new THREE.MeshPhysicalMaterial({ color: currentPalette.U, emissive: currentPalette.U, ...stickerPhysProps });
+                            const tile = new THREE.Mesh(geom, mat);
+                            tile.position.set(0, stickerOffset, 0);
+                            
+                            tile.userData = {
+                                localNormal: new THREE.Vector3(0, 1, 0),
+                                motionAxes: [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1)]
+                            };
+                            cubieGroup.add(tile);
+                        }
+                        // Bottom (-Y) - Yellow
+                        if (y === -1) {
+                            const geom = new THREE.BoxGeometry(stickerWidth, stickerHeight, stickerWidth);
+                            const mat = new THREE.MeshPhysicalMaterial({ color: currentPalette.D, emissive: currentPalette.D, ...stickerPhysProps });
+                            const tile = new THREE.Mesh(geom, mat);
+                            tile.position.set(0, -stickerOffset, 0);
+                            
+                            tile.userData = {
+                                localNormal: new THREE.Vector3(0, -1, 0),
+                                motionAxes: [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1)]
+                            };
+                            cubieGroup.add(tile);
+                        }
+                        // Front (+Z) - Green
+                        if (z === 1) {
+                            const geom = new THREE.BoxGeometry(stickerWidth, stickerWidth, stickerHeight);
+                            const mat = new THREE.MeshPhysicalMaterial({ color: currentPalette.F, emissive: currentPalette.F, ...stickerPhysProps });
+                            const tile = new THREE.Mesh(geom, mat);
+                            tile.position.set(0, 0, stickerOffset);
+                            
+                            tile.userData = {
+                                localNormal: new THREE.Vector3(0, 0, 1),
+                                motionAxes: [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0)]
+                            };
+                            cubieGroup.add(tile);
+                        }
+                        // Back (-Z) - Blue
+                        if (z === -1) {
+                            const geom = new THREE.BoxGeometry(stickerWidth, stickerWidth, stickerHeight);
+                            const mat = new THREE.MeshPhysicalMaterial({ color: currentPalette.B, emissive: currentPalette.B, ...stickerPhysProps });
+                            const tile = new THREE.Mesh(geom, mat);
+                            tile.position.set(0, 0, -stickerOffset);
+                            
+                            tile.userData = {
+                                localNormal: new THREE.Vector3(0, 0, -1),
+                                motionAxes: [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0)]
+                            };
+                            cubieGroup.add(tile);
+                        }
+
+                        // Align in relative coordinates
+                        cubieGroup.position.set(x, y, z);
+                        cubieGroup.customCoords = { x, y, z };
+
+                        cubeContainer.add(cubieGroup);
+                        cubies.push(cubieGroup);
+                    }
+                }
+            }
+            updateSolvedStatus();
+        }
+
+        // -------------------------------------------------------------
+        // Hot-Swap Palettes with Preservation
+        // -------------------------------------------------------------
+        window.setCubePalette = function(paletteName) {
+            if (!PALETTES[paletteName]) return;
+            activePaletteName = paletteName;
+            currentPalette = PALETTES[paletteName];
+
+            // Cache positions to update colors without resetting scrambled orientations
+            const transformCache = cubies.map(cubie => {
+                return {
+                    pos: cubie.position.clone(),
+                    rot: cubie.quaternion.clone(),
+                    coords: { ...cubie.customCoords }
+                };
+            });
+
+            buildRubiksCube();
+
+            // Reapply cache onto new geometry structures
+            for (let i = 0; i < cubies.length; i++) {
+                cubies[i].position.copy(transformCache[i].pos);
+                cubies[i].quaternion.copy(transformCache[i].rot);
+                cubies[i].customCoords = transformCache[i].coords;
+            }
+
+            document.getElementById('palette-overlay').classList.add('hidden');
+            showToast(`Palette loaded: ${paletteName.toUpperCase()}`, "success");
+        };
+
+        function animateLoop() {
+            requestAnimationFrame(animateLoop);
+
+            // Orbit controls update
+            controls.update();
+
+            const time = Date.now() * 0.0006;
+
+            // Cosmic Drift Starfield Twinkling
+            if (scene.userData.starryCloud) {
+                scene.userData.starryCloud.rotation.y = time * 0.015;
+                scene.userData.starryCloud.rotation.z = time * 0.005;
+            }
+            if (scene.userData.nebula) {
+                scene.userData.nebula.rotation.y = -time * 0.008;
+            }
+
+            // Zero-Gravity floating and tumbling physics
+            // Float weightlessly if the user is not actively interacting with pointer down
+            if (cubeContainer && !isPointerDown && !isMoving && moveQueue.length === 0) {
+                // Bob gently up and down
+                cubeContainer.position.y = Math.sin(time * 0.6) * 0.16;
+                // Wobble slightly sideways
+                cubeContainer.position.x = Math.cos(time * 0.4) * 0.12;
+                
+                // Slow zero-gravity planetary tumbling rotation
+                cubeContainer.rotation.y = time * 0.02;
+                cubeContainer.rotation.x = Math.sin(time * 0.15) * 0.06;
+                cubeContainer.rotation.z = Math.cos(time * 0.1) * 0.04;
+            } else if (cubeContainer && (isPointerDown || isMoving || moveQueue.length > 0)) {
+                // When actively interacting, damp drifting velocities and smoothly return coordinates to the origin center 
+                cubeContainer.position.lerp(new THREE.Vector3(0, 0, 0), 0.1);
+                
+                // Reset tumbling rotation gently to maintain standard direct axis manipulation alignments
+                const currentRot = cubeContainer.rotation.toVector3();
+                cubeContainer.rotation.set(
+                    currentRot.x * 0.9,
+                    currentRot.y * 0.9,
+                    currentRot.z * 0.9
+                );
+            }
+
+            // Central rendering
+            renderer.render(scene, camera);
+
+            // Execute queued moves sequentially
+            if (!isMoving && moveQueue.length > 0) {
+                const next = moveQueue.shift();
+                executeRotation(next.face, next.clockwise, next.isDemo);
+            }
+        }
+
+        // Handle Responsive Resizing
+        window.addEventListener('resize', () => {
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        });
+
+        // -------------------------------------------------------------
+        // World Space Projective Rotation Physics
+        // -------------------------------------------------------------
+        const FACE_DEFINITIONS = {
+            'U': { axis: 'y', val: 1, angle: -Math.PI / 2 },
+            'D': { axis: 'y', val: -1, angle: Math.PI / 2 },
+            'L': { axis: 'x', val: -1, angle: Math.PI / 2 },
+            'R': { axis: 'x', val: 1, angle: -Math.PI / 2 },
+            'F': { axis: 'z', val: 1, angle: -Math.PI / 2 },
+            'B': { axis: 'z', val: -1, angle: Math.PI / 2 }
+        };
+
+        function executeRotation(face, clockwise = true, isDemo = false) {
+            if (isMoving) return;
+            isMoving = true;
+
+            const def = FACE_DEFINITIONS[face];
+            if (!def) {
+                isMoving = false;
+                return;
+            }
+
+            let targetAngle = def.angle;
+            if (!clockwise) targetAngle = -targetAngle;
+
+            // Gather elements lying on targeted layer
+            const tolerance = 0.15;
+            const movingCubies = cubies.filter(cubie => {
+                const posVal = cubie.position[def.axis];
+                return Math.abs(posVal - def.val) < tolerance;
+            });
+
+            const pivot = new THREE.Group();
+            cubeContainer.add(pivot);
+
+            movingCubies.forEach(cubie => {
+                pivot.attach(cubie);
+            });
+
+            let elapsed = 0;
+            const duration = currentMoveSpeed;
+            const startRot = 0;
+            const targetRot = targetAngle;
+            const clock = new THREE.Clock();
+
+            function animatePivot() {
+                const delta = clock.getDelta() * 1000;
+                elapsed += delta;
+                const progress = Math.min(elapsed / duration, 1);
+
+                if (def.axis === 'x') pivot.rotation.x = startRot + progress * (targetRot - startRot);
+                if (def.axis === 'y') pivot.rotation.y = startRot + progress * (targetRot - startRot);
+                if (def.axis === 'z') pivot.rotation.z = startRot + progress * (targetRot - startRot);
+
+                if (progress < 1) {
+                    requestAnimationFrame(animatePivot);
+                } else {
+                    if (def.axis === 'x') pivot.rotation.x = targetRot;
+                    if (def.axis === 'y') pivot.rotation.y = targetRot;
+                    if (def.axis === 'z') pivot.rotation.z = targetRot;
+
+                    pivot.updateMatrixWorld();
+
+                    movingCubies.forEach(cubie => {
+                        cubeContainer.attach(cubie);
+                        cubie.position.x = Math.round(cubie.position.x);
+                        cubie.position.y = Math.round(cubie.position.y);
+                        cubie.position.z = Math.round(cubie.position.z);
+                    });
+
+                    cubeContainer.remove(pivot);
+
+                    if (!isDemo) {
+                        moveHistory.push({ face, clockwise });
+                    }
+
+                    isMoving = false;
+                    updateSolvedStatus();
+                }
+            }
+
+            clock.getDelta();
+            animatePivot();
+        }
+
+        // -------------------------------------------------------------
+        // Pointer/Touch Direct Drag Handlers
+        // -------------------------------------------------------------
+        function setupInteractivePointerDrag() {
+            container.addEventListener('pointerdown', onPointerDown);
+            container.addEventListener('pointermove', onPointerMove);
+            window.addEventListener('pointerup', onPointerUp);
+        }
+
+        function onPointerDown(e) {
+            if (isMoving) return;
+
+            const rect = renderer.domElement.getBoundingClientRect();
+            const mouse = new THREE.Vector2(
+                ((e.clientX - rect.left) / rect.width) * 2 - 1,
+                -((e.clientY - rect.top) / rect.height) * 2 + 1
+            );
+
+            // Raycast sticker meshes
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, camera);
+            
+            // Query only the custom cubies within standard space
+            const intersects = raycaster.intersectObjects(cubies, true);
+
+            if (intersects.length > 0) {
+                const hit = intersects[0];
+                
+                // Traverse up hierarchy to locate parent Group
+                let cubieParent = hit.object;
+                while (cubieParent && cubieParent.parent !== cubeContainer) {
+                    cubieParent = cubieParent.parent;
+                }
+
+                // Check that the immediate clicked object is a colored sticker tile with metadata
+                if (cubieParent && hit.object.userData && hit.object.userData.motionAxes) {
+                    clickedCubie = cubieParent;
+                    clickedSticker = hit.object;
+                    clickedPoint = hit.point.clone();
+
+                    // Convert sticker's local normal to world coordinate
+                    const localNormal = clickedSticker.userData.localNormal.clone();
+                    const normalMatrix = new THREE.Matrix3().getNormalMatrix(clickedSticker.matrixWorld);
+                    clickedNormal = localNormal.applyMatrix3(normalMatrix).normalize();
+
+                    isPointerDown = true;
+                    pointerStart.x = e.clientX;
+                    pointerStart.y = e.clientY;
+
+                    // Pause camera orbiting while performing swipes
+                    controls.enabled = false;
+                }
+            }
+        }
+
+        function onPointerMove(e) {
+            if (!isPointerDown || !clickedCubie || !clickedSticker || isMoving) return;
+
+            const dx = e.clientX - pointerStart.x;
+            const dy = e.clientY - pointerStart.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // 15px threshold ensures swipe detection is immediate and responsive
+            if (distance > 15) {
+                isPointerDown = false; // Prevent double triggers
+
+                const dragVector2D = new THREE.Vector2(dx, dy);
+
+                // Fetch dynamic motion axes defined on the clicked sticker
+                const motionAxes = clickedSticker.userData.motionAxes;
+
+                // Transform local motion unit vectors into world space based on active cubie rotations
+                const worldAxis1 = motionAxes[0].clone().applyQuaternion(clickedCubie.quaternion).normalize();
+                const worldAxis2 = motionAxes[1].clone().applyQuaternion(clickedCubie.quaternion).normalize();
+
+                // Project world positions onto the 2D camera viewport plane
+                const pScreen = clickedPoint.clone().project(camera);
+                const pScreenAxis1 = clickedPoint.clone().add(worldAxis1).project(camera);
+                const pScreenAxis2 = clickedPoint.clone().add(worldAxis2).project(camera);
+
+                const rect = renderer.domElement.getBoundingClientRect();
+                const screenPos = new THREE.Vector2((pScreen.x * 0.5 + 0.5) * rect.width, (-(pScreen.y * 0.5 - 0.5)) * rect.height);
+                const screenPos1 = new THREE.Vector2((pScreenAxis1.x * 0.5 + 0.5) * rect.width, (-(pScreenAxis1.y * 0.5 - 0.5)) * rect.height);
+                const screenPos2 = new THREE.Vector2((pScreenAxis2.x * 0.5 + 0.5) * rect.width, (-(pScreenAxis2.y * 0.5 - 0.5)) * rect.height);
+
+                // Determine pixel swipe directions
+                const dir1 = new THREE.Vector2().subVectors(screenPos1, screenPos).normalize();
+                const dir2 = new THREE.Vector2().subVectors(screenPos2, screenPos).normalize();
+
+                // Perform dot-product checks to identify matching tangent alignments
+                const dot1 = dragVector2D.dot(dir1);
+                const dot2 = dragVector2D.dot(dir2);
+
+                let chosenAxis, chosenSign;
+                if (Math.abs(dot1) > Math.abs(dot2)) {
+                    chosenAxis = worldAxis1;
+                    chosenSign = Math.sign(dot1);
+                } else {
+                    chosenAxis = worldAxis2;
+                    chosenSign = Math.sign(dot2);
+                }
+
+                // Compute rotation axis in world coordinates: (Normal x Motion Axis)
+                const rotAxisWorld = new THREE.Vector3().crossVectors(clickedNormal, chosenAxis).normalize();
+
+                // Translate world rotation coordinates into the active cubeContainer local coordinate space
+                const invContainerQuat = cubeContainer.quaternion.clone().invert();
+                const rotAxisLocal = rotAxisWorld.clone().applyQuaternion(invContainerQuat);
+
+                // Map rotation coordinate back to primary local axis keys (X, Y, or Z)
+                const rx = rotAxisLocal.x;
+                const ry = rotAxisLocal.y;
+                const rz = rotAxisLocal.z;
+
+                let rAxis = '';
+                let rSign = 0;
+                
+                if (Math.abs(rx) > Math.abs(ry) && Math.abs(rx) > Math.abs(rz)) {
+                    rAxis = 'x';
+                    rSign = Math.sign(rx);
+                } else if (Math.abs(ry) > Math.abs(rx) && Math.abs(ry) > Math.abs(rz)) {
+                    rAxis = 'y';
+                    rSign = Math.sign(ry);
+                } else {
+                    rAxis = 'z';
+                    rSign = Math.sign(rz);
+                }
+
+                // Identify layer coordinates
+                const cx = Math.round(clickedCubie.position.x);
+                const cy = Math.round(clickedCubie.position.y);
+                const cz = Math.round(clickedCubie.position.z);
+
+                let faceToTurn = '';
+                let clockwise = true;
+
+                // Match axis targets to speedcubing face notation U, D, L, R, F, B
+                if (rAxis === 'y') {
+                    if (cy === 1) { faceToTurn = 'U'; clockwise = (rSign * chosenSign < 0); }
+                    else if (cy === -1) { faceToTurn = 'D'; clockwise = (rSign * chosenSign > 0); }
+                } else if (rAxis === 'x') {
+                    if (cx === 1) { faceToTurn = 'R'; clockwise = (rSign * chosenSign < 0); }
+                    else if (cx === -1) { faceToTurn = 'L'; clockwise = (rSign * chosenSign > 0); }
+                } else if (rAxis === 'z') {
+                    if (cz === 1) { faceToTurn = 'F'; clockwise = (rSign * chosenSign < 0); }
+                    else if (cz === -1) { faceToTurn = 'B'; clockwise = (rSign * chosenSign > 0); }
+                }
+
+                if (faceToTurn) {
+                    const notation = faceToTurn + (clockwise ? "" : "'");
+                    triggerMove(notation);
+                }
+            }
+        }
+
+        function onPointerUp() {
+            isPointerDown = false;
+            clickedCubie = null;
+            clickedSticker = null;
+            clickedPoint = null;
+            clickedNormal = null;
+
+            // Restore camera orbiting once swipe is completed
+            controls.enabled = true;
+        }
+
+        function triggerMove(notation) {
+            const clean = notation.replace("'", "");
+            const clockwise = !notation.includes("'");
+            moveQueue.push({ face: clean, clockwise, isDemo: false });
+        }
+
+        // -------------------------------------------------------------
+        // Official Scrambler Mechanics
+        // -------------------------------------------------------------
+        const possibleMoves = ['U', 'D', 'L', 'R', 'F', 'B'];
+        const notationModifiers = ['', "'", '2'];
+
+        function generateScramble() {
+            let scrambleList = [];
+            let lastFace = '';
+
+            for (let i = 0; i < 20; i++) {
+                let randomFace;
+                do {
+                    randomFace = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                } while (randomFace === lastFace);
+
+                const modifier = notationModifiers[Math.floor(Math.random() * notationModifiers.length)];
+                scrambleList.push(randomFace + modifier);
+                lastFace = randomFace;
+            }
+
+            const scrambleString = scrambleList.join(' ');
+            document.getElementById('scramble-display').innerText = scrambleString;
+
+            scrambleList.forEach(move => {
+                const face = move[0];
+                const modifier = move.substring(1);
+
+                if (modifier === '') {
+                    moveQueue.push({ face, clockwise: true, isDemo: true });
+                } else if (modifier === "'") {
+                    moveQueue.push({ face, clockwise: false, isDemo: true });
+                } else if (modifier === '2') {
+                    moveQueue.push({ face, clockwise: true, isDemo: true });
+                    moveQueue.push({ face, clockwise: true, isDemo: true });
+                }
+            });
+
+            moveHistory = [];
+        }
+
+        function startSolveHistoryRewind() {
+            if (moveHistory.length === 0) {
+                showToast("No histories found to rewind! Try scrambling first.", "info");
+                return;
+            }
+
+            const rewindList = [...moveHistory].reverse();
+            moveHistory = [];
+
+            rewindList.forEach(step => {
+                moveQueue.push({
+                    face: step.face,
+                    clockwise: !step.clockwise,
+                    isDemo: true
+                });
+            });
+
+            showToast("Solving via backtrack sequence...", "success");
+        }
+
+        function instantFullReset() {
+            moveQueue = [];
+            moveHistory = [];
+            buildRubiksCube();
+            showToast("Cube reset to original solved state.", "success");
+        }
+
+        window.demoAlgo = function(movesArr) {
+            document.getElementById('instructions-overlay').classList.add('hidden');
+            movesArr.forEach(m => {
+                const face = m[0];
+                const clockwise = !m.includes("'");
+                moveQueue.push({ face, clockwise, isDemo: true });
+            });
+        };
+
+        // -------------------------------------------------------------
+        // Solved Evaluation System
+        // -------------------------------------------------------------
+        function updateSolvedStatus() {
+            const isSolved = checkCubeSolved();
+            const badge = document.getElementById('solved-status-badge');
+
+            if (isSolved) {
+                badge.className = "flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-3 py-1.5 rounded-xl font-bold text-xs tracking-wider";
+                badge.innerHTML = `<span class="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>CUBE SOLVED`;
+
+                if (isTimerRunning) {
+                    toggleTimerState();
+                    recordSolvedTime();
+                }
+            } else {
+                badge.className = "flex items-center gap-2 bg-rose-500/10 border border-rose-500/30 text-rose-400 px-3 py-1.5 rounded-xl font-bold text-xs tracking-wider";
+                badge.innerHTML = `<span class="w-2.5 h-2.5 bg-rose-500 rounded-full animate-pulse"></span>UNSOLVED / TURNING`;
+            }
+        }
+
+        function checkCubeSolved() {
+            const faces = [
+                { axis: 'x', coord: 1, matIndex: 1 },  // Right (Colored sticker geometry index)
+                { axis: 'x', coord: -1, matIndex: 1 }, // Left
+                { axis: 'y', coord: 1, matIndex: 1 },  // Top
+                { axis: 'y', coord: -1, matIndex: 1 }, // Bottom
+                { axis: 'z', coord: 1, matIndex: 1 },  // Front
+                { axis: 'z', coord: -1, matIndex: 1 }  // Back
+            ];
+
+            for (let f of faces) {
+                // Query cubie groups positioned at targeted layer coordinates
+                const targetCubs = cubies.filter(c => Math.round(c.position[f.axis]) === f.coord);
+                if (targetCubs.length === 0) return false;
+
+                const firstCubie = targetCubs[0];
+                if (firstCubie.children.length < 2) continue; // Safety check
+
+                // Read base color from first active sticker
+                const baseColor = firstCubie.children[1].material.color.getHex();
+
+                for (let cub of targetCubs) {
+                    // Query world outer sticker child matching current coordinate alignment
+                    const matchedStickers = cub.children.slice(1).filter(tile => {
+                        const worldOffset = tile.position.clone().applyQuaternion(cub.quaternion);
+
+                        if (f.axis === 'x' && Math.round(worldOffset.x * 2) === f.coord) return true;
+                        if (f.axis === 'y' && Math.round(worldOffset.y * 2) === f.coord) return true;
+                        if (f.axis === 'z' && Math.round(worldOffset.z * 2) === f.coord) return true;
+                        return false;
+                    });
+
+                    if (matchedStickers.length > 0) {
+                        if (matchedStickers[0].material.color.getHex() !== baseColor) {
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        // -------------------------------------------------------------
+        // Speedcubing Timer Clock
+        // -------------------------------------------------------------
+        function toggleTimerState() {
+            if (!isTimerRunning) {
+                isTimerRunning = true;
+                timerStart = performance.now();
+                document.getElementById('timer-display').classList.remove('text-white');
+                document.getElementById('timer-display').classList.add('text-cyan-400', 'animate-pulse');
+
+                timerInterval = setInterval(() => {
+                    const elapsed = performance.now() - timerStart;
+                    document.getElementById('timer-display').innerText = formatTime(elapsed);
+                }, 10);
+            } else {
+                isTimerRunning = false;
+                clearInterval(timerInterval);
+                document.getElementById('timer-display').classList.remove('text-cyan-400', 'animate-pulse');
+                document.getElementById('timer-display').classList.add('text-white');
+            }
+        }
+
+        function formatTime(ms) {
+            if (ms < 0) ms = 0;
+            const minutes = Math.floor(ms / 60000);
+            const seconds = Math.floor((ms % 60000) / 1000);
+            const centiseconds = Math.floor((ms % 1000) / 10);
+
+            const mStr = minutes > 0 ? `${minutes}:` : '';
+            const sStr = seconds < 10 && minutes > 0 ? `0${seconds}` : seconds;
+            const cStr = centiseconds < 10 ? `0${centiseconds}` : centiseconds;
+
+            return `${mStr}${sStr}.${cStr}`;
+        }
+
+        function recordSolvedTime() {
+            const elapsed = performance.now() - timerStart;
+            solveTimes.push(elapsed);
+            rebuildSessionStats();
+        }
+
+        function rebuildSessionStats() {
+            const listContainer = document.getElementById('solves-list-container');
+            if (solveTimes.length === 0) {
+                listContainer.innerHTML = `<div class="text-xs text-indigo-400/50 italic text-center py-4">Zero logs recorded. Complete a solve or stop the stopwatch!</div>`;
+                return;
+            }
+
+            listContainer.innerHTML = '';
+
+            [...solveTimes].reverse().forEach((time, index) => {
+                const actualIndex = solveTimes.length - index;
+                const row = document.createElement('div');
+                row.className = "flex items-center justify-between p-2.5 bg-indigo-950/20 border border-indigo-950/45 rounded-xl hover:bg-indigo-950/50 transition-all text-xs";
+                row.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="text-indigo-400 font-mono">#${actualIndex}</span>
+                        <span class="font-bold text-cyan-400 font-mono">${formatTime(time)}</span>
+                    </div>
+                    <button onclick="deleteSolve(${actualIndex - 1})" class="text-indigo-500 hover:text-rose-400 transition-all">
+                        <i data-lucide="trash" class="w-3.5 h-3.5"></i>
+                    </button>
+                `;
+                listContainer.appendChild(row);
+            });
+            lucide.createIcons();
+
+            const best = Math.min(...solveTimes);
+            document.getElementById('stat-best').innerText = formatTime(best);
+
+            if (solveTimes.length >= 5) {
+                const last5 = solveTimes.slice(-5);
+                const sorted = [...last5].sort((a,b) => a - b);
+                const sum = sorted[1] + sorted[2] + sorted[3];
+                document.getElementById('stat-ao5').innerText = formatTime(sum / 3);
+            } else {
+                document.getElementById('stat-ao5').innerText = "-";
+            }
+
+            if (solveTimes.length >= 12) {
+                const last12 = solveTimes.slice(-12);
+                const sorted = [...last12].sort((a,b) => a - b);
+                let sum = 0;
+                for (let i = 1; i <= 10; i++) sum += sorted[i];
+                document.getElementById('stat-ao12').innerText = formatTime(sum / 10);
+            } else {
+                document.getElementById('stat-ao12').innerText = "-";
+            }
+        }
+
+        window.deleteSolve = function(index) {
+            solveTimes.splice(index, 1);
+            rebuildSessionStats();
+        };
+
+        // -------------------------------------------------------------
+        // Key and UI Event Observers
+        // -------------------------------------------------------------
+        window.addEventListener('keydown', (e) => {
+            if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
+                return;
+            }
+
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (!holdsSpace) {
+                    holdsSpace = true;
+                    if (isTimerRunning) {
+                        toggleTimerState();
+                        recordSolvedTime();
+                    } else {
+                        document.getElementById('timer-display').classList.add('text-rose-500');
+                    }
+                }
+            }
+
+            const key = e.key.toUpperCase();
+            const shiftPressed = e.shiftKey;
+            const validKeys = ['U', 'D', 'L', 'R', 'F', 'B'];
+
+            if (validKeys.includes(key)) {
+                const moveNotation = key + (shiftPressed ? "'" : "");
+                triggerMove(moveNotation);
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                holdsSpace = false;
+                document.getElementById('timer-display').classList.remove('text-rose-500');
+                if (!isTimerRunning && !isMoving) {
+                    toggleTimerState();
+                }
+            }
+        });
+
+        document.getElementById('timer-tap-area').addEventListener('click', () => {
+            toggleTimerState();
+            if (!isTimerRunning) {
+                recordSolvedTime();
+            }
+        });
+
+        document.getElementById('reset-camera-btn').addEventListener('click', () => {
+            camera.position.set(7, 6, 9);
+            controls.target.set(0, 0, 0);
+            controls.update();
+            showToast("Camera perspective returned to default.", "info");
+        });
+
+        // Interface Modal Toggles
+        const helpBtn = document.getElementById('help-btn');
+        const themeBtn = document.getElementById('theme-btn');
+        const closeHelpBtn = document.getElementById('close-help-btn');
+        const closePaletteBtn = document.getElementById('close-palette-btn');
+        const helpOverlay = document.getElementById('instructions-overlay');
+        const paletteOverlay = document.getElementById('palette-overlay');
+
+        helpBtn.addEventListener('click', () => helpOverlay.classList.remove('hidden'));
+        closeHelpBtn.addEventListener('click', () => helpOverlay.classList.add('hidden'));
+
+        themeBtn.addEventListener('click', () => paletteOverlay.classList.remove('hidden'));
+        closePaletteBtn.addEventListener('click', () => paletteOverlay.classList.add('hidden'));
+
+        [helpOverlay, paletteOverlay].forEach(overlay => {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) overlay.classList.add('hidden');
+            });
+        });
+
+        const speedSlider = document.getElementById('speed-slider');
+        const speedValLabel = document.getElementById('slider-val-label');
+
+        speedSlider.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            currentMoveSpeed = val;
+
+            if (val <= 150) {
+                speedValLabel.innerText = `Fast (${val}ms)`;
+            } else if (val <= 300) {
+                speedValLabel.innerText = `Medium (${val}ms)`;
+            } else {
+                speedValLabel.innerText = `Slow Drift (${val}ms)`;
+            }
+        });
+
+        document.getElementById('scramble-btn').addEventListener('click', generateScramble);
+        document.getElementById('solve-btn').addEventListener('click', startSolveHistoryRewind);
+        document.getElementById('instant-reset-btn').addEventListener('click', instantFullReset);
+        document.getElementById('clear-solves-btn').addEventListener('click', () => {
+            solveTimes = [];
+            rebuildSessionStats();
+            showToast("Space session logs cleared.", "info");
+        });
+
+        function showToast(msg, type = "info") {
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-6 right-6 px-4 py-3 rounded-2xl border text-xs font-bold tracking-wide shadow-2xl transition-all duration-300 transform translate-y-10 opacity-0 z-50 flex items-center gap-2 backdrop-blur-md`;
+
+            if (type === "success") {
+                toast.classList.add("bg-emerald-950/90", "border-emerald-500/40", "text-emerald-400");
+                toast.innerHTML = `<i data-lucide="check-circle" class="w-4 h-4"></i> ${msg}`;
+            } else if (type === "error") {
+                toast.classList.add("bg-rose-950/90", "border-rose-500/40", "text-rose-400");
+                toast.innerHTML = `<i data-lucide="alert-circle" class="w-4 h-4"></i> ${msg}`;
+            } else {
+                toast.classList.add("bg-indigo-950/95", "border-indigo-900/40", "text-cyan-400");
+                toast.innerHTML = `<i data-lucide="info" class="w-4 h-4"></i> ${msg}`;
+            }
+
+            document.body.appendChild(toast);
+            lucide.createIcons();
+
+            setTimeout(() => {
+                toast.classList.remove("translate-y-10", "opacity-0");
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add("translate-y-10", "opacity-0");
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Run application on window load
+        window.onload = function() {
+            initThree();
+        };
+    </script>
+</body>
+</html>
